@@ -6,6 +6,15 @@
 #include <cinttypes>
 #include <cassert>
 
+unsigned long long nactive = 0;
+unsigned long long active_size = 0;
+unsigned long long ntotal = 0;
+unsigned long long total_size = 0;
+unsigned long long nfail = 0;
+unsigned long long fail_size = 0;
+uintptr_t heap_min = UINTPTR_MAX;
+uintptr_t heap_max = 0;
+
 /// m61_malloc(sz, file, line)
 ///    Return a pointer to `sz` bytes of newly-allocated dynamic memory.
 ///    The memory is not initialized. If `sz == 0`, then m61_malloc must
@@ -14,8 +23,25 @@
 
 void* m61_malloc(size_t sz, const char* file, long line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
-    // Your code here.
-    return base_malloc(sz);
+    void* ptr = base_malloc(sz);
+    if (ptr) {
+        ++ntotal;
+        total_size += sz;
+        ++nactive;
+        active_size += sz;
+
+        uintptr_t addr = (uintptr_t) ptr;
+        if (addr < heap_min) {
+            heap_min = addr;
+        }
+        if (addr + sz - 1 > heap_max) {
+            heap_max = addr + sz - 1;
+        }
+    } else {
+        ++nfail;
+        fail_size += sz;
+    }
+    return ptr;
 }
 
 
@@ -26,7 +52,9 @@ void* m61_malloc(size_t sz, const char* file, long line) {
 
 void m61_free(void* ptr, const char* file, long line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
-    // Your code here.
+    if (ptr) {
+        --nactive;
+    }
     base_free(ptr);
 }
 
@@ -51,10 +79,15 @@ void* m61_calloc(size_t nmemb, size_t sz, const char* file, long line) {
 /// m61_get_statistics(stats)
 ///    Store the current memory statistics in `*stats`.
 
-void m61_get_statistics(m61_statistics* stats) {
-    // Stub: set all statistics to enormous numbers
-    memset(stats, 255, sizeof(m61_statistics));
-    // Your code here.
+void m61_get_statistics(m61_statistics* stats) {    
+    stats->nactive = nactive;
+    stats->active_size = active_size;
+    stats->ntotal = ntotal;
+    stats->total_size = total_size;
+    stats->nfail = nfail;
+    stats->fail_size = fail_size;
+    stats->heap_min = heap_min;
+    stats->heap_max = heap_max;
 }
 
 
