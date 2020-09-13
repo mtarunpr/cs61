@@ -16,8 +16,14 @@ m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
 
 void* m61_malloc(size_t sz, const char* file, long line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
-    size_t* metaptr = (size_t*) base_malloc(sz + 2 * sizeof(size_t));
+
+    size_t* metaptr = nullptr;
     void* ptr = nullptr;
+
+    // Ensure size does not overflow after adding 16 bytes of metadata
+    if (sz <= SIZE_MAX - 2 * sizeof(size_t)) {
+        metaptr = (size_t*) base_malloc(sz + 2 * sizeof(size_t));
+    }
 
     if (metaptr) {
         *metaptr = sz;
@@ -68,8 +74,18 @@ void m61_free(void* ptr, const char* file, long line) {
 ///    location `file`:`line`.
 
 void* m61_calloc(size_t nmemb, size_t sz, const char* file, long line) {
-    // Your code here (to fix test019).
-    void* ptr = m61_malloc(nmemb * sz, file, line);
+
+    void* ptr = nullptr;
+
+    // Ensure `nmemb * sz` does not overflow 
+    if (nmemb <= SIZE_MAX / sz) {
+        ptr = m61_malloc(nmemb * sz, file, line);
+    } else {
+        // Impossible to keep track of fail_size due to oveflow,
+        // so we only keep track of nfail
+        g_stats.nfail++;
+    }
+    
     if (ptr) {
         memset(ptr, 0, nmemb * sz);
     }
