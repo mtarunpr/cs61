@@ -6,14 +6,7 @@
 #include <cinttypes>
 #include <cassert>
 
-unsigned long long nactive = 0;
-unsigned long long active_size = 0;
-unsigned long long ntotal = 0;
-unsigned long long total_size = 0;
-unsigned long long nfail = 0;
-unsigned long long fail_size = 0;
-uintptr_t heap_min = UINTPTR_MAX;
-uintptr_t heap_max = 0;
+m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
 
 /// m61_malloc(sz, file, line)
 ///    Return a pointer to `sz` bytes of newly-allocated dynamic memory.
@@ -23,23 +16,28 @@ uintptr_t heap_max = 0;
 
 void* m61_malloc(size_t sz, const char* file, long line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
-    void* ptr = base_malloc(sz);
-    if (ptr) {
-        ++ntotal;
-        total_size += sz;
-        ++nactive;
-        active_size += sz;
+    size_t* metaptr = (size_t*) base_malloc(sz + 2 * sizeof(size_t));
+    void* ptr = nullptr;
+
+    if (metaptr) {
+        *metaptr = sz;
+        ptr = metaptr + 2;
+
+        g_stats.ntotal++;
+        g_stats.total_size += sz;
+        g_stats.nactive++;
+        g_stats.active_size += sz;
 
         uintptr_t addr = (uintptr_t) ptr;
-        if (addr < heap_min) {
-            heap_min = addr;
+        if (addr < g_stats.heap_min) {
+            g_stats.heap_min = addr;
         }
-        if (addr + sz - 1 > heap_max) {
-            heap_max = addr + sz - 1;
+        if (addr + sz - 1 > g_stats.heap_max) {
+            g_stats.heap_max = addr + sz - 1;
         }
     } else {
-        ++nfail;
-        fail_size += sz;
+        g_stats.nfail++;
+        g_stats.fail_size += sz;
     }
     return ptr;
 }
@@ -52,10 +50,13 @@ void* m61_malloc(size_t sz, const char* file, long line) {
 
 void m61_free(void* ptr, const char* file, long line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
+    size_t* metaptr = nullptr;
     if (ptr) {
-        --nactive;
+        metaptr = (size_t*) ptr - 2;
+        g_stats.nactive--;
+        g_stats.active_size -= *metaptr;
     }
-    base_free(ptr);
+    base_free(metaptr);
 }
 
 
@@ -80,14 +81,7 @@ void* m61_calloc(size_t nmemb, size_t sz, const char* file, long line) {
 ///    Store the current memory statistics in `*stats`.
 
 void m61_get_statistics(m61_statistics* stats) {    
-    stats->nactive = nactive;
-    stats->active_size = active_size;
-    stats->ntotal = ntotal;
-    stats->total_size = total_size;
-    stats->nfail = nfail;
-    stats->fail_size = fail_size;
-    stats->heap_min = heap_min;
-    stats->heap_max = heap_max;
+    *stats = g_stats;
 }
 
 
