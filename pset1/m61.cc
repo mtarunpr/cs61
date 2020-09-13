@@ -6,6 +6,13 @@
 #include <cinttypes>
 #include <cassert>
 
+struct metadata {
+    uintptr_t checksum;
+    size_t size;
+    bool freed;
+    char padding[15];
+};
+
 m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
 
 /// m61_malloc(sz, file, line)
@@ -17,17 +24,19 @@ m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
 void* m61_malloc(size_t sz, const char* file, long line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
 
-    size_t* metaptr = nullptr;
+    metadata* metaptr = nullptr;
     void* ptr = nullptr;
 
     // Ensure size does not overflow after adding 16 bytes of metadata
-    if (sz <= SIZE_MAX - 2 * sizeof(size_t)) {
-        metaptr = (size_t*) base_malloc(sz + 2 * sizeof(size_t));
+    if (sz <= SIZE_MAX - sizeof(metadata)) {
+        metaptr = (metadata*) base_malloc(sz + sizeof(metadata));
     }
 
     if (metaptr) {
-        *metaptr = sz;
-        ptr = metaptr + 2;
+        metaptr->checksum = (uintptr_t) metaptr;
+        metaptr->size = sz;
+        metaptr->freed = false;
+        ptr = metaptr + 1;
 
         g_stats.ntotal++;
         g_stats.total_size += sz;
@@ -55,12 +64,29 @@ void* m61_malloc(size_t sz, const char* file, long line) {
 ///    does nothing. The free was called at location `file`:`line`.
 
 void m61_free(void* ptr, const char* file, long line) {
-    (void) file, (void) line;   // avoid uninitialized variable warnings
-    size_t* metaptr = nullptr;
+    metadata* metaptr = nullptr;
+
     if (ptr) {
-        metaptr = (size_t*) ptr - 2;
+        if ((uintptr_t) ptr < g_stats.heap_min || (uintptr_t) ptr > g_stats.heap_max) {
+            fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, not in heap\n", file, line, ptr);
+            abort();
+        }
+
+        metaptr = (metadata*) ptr - 1;
+
+        if (metaptr->checksum != (uintptr_t) metaptr) {
+            fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, not allocated\n", file, line, ptr);
+            abort();
+        }
+
+        if (metaptr->freed) {
+            fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, double free\n", file, line, ptr);
+            abort();
+        }
+
+        metaptr->freed = true;
         g_stats.nactive--;
-        g_stats.active_size -= *metaptr;
+        g_stats.active_size -= metaptr->size;
     }
     base_free(metaptr);
 }
