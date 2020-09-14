@@ -6,6 +6,10 @@
 #include <cinttypes>
 #include <cassert>
 
+// Arbitrary sequence of bytes to denote end of allocated memory
+// Lack of obvious pattern to reduce chance of user writing these very bytes
+const unsigned char terminator[] = {42, 183, 229, 13};
+
 struct metadata {
     uintptr_t checksum;
     size_t size;
@@ -27,20 +31,23 @@ void* m61_malloc(size_t sz, const char* file, long line) {
     metadata* metaptr = nullptr;
     void* ptr = nullptr;
 
-    // Ensure size does not overflow after adding 16 bytes of metadata
-    if (sz <= SIZE_MAX - sizeof(metadata)) {
-        metaptr = (metadata*) base_malloc(sz + sizeof(metadata));
+    // Ensure size does not overflow after adding metadata + terminator
+    if (sz <= SIZE_MAX - sizeof(metadata) - sizeof(terminator)) {
+        metaptr = (metadata*) base_malloc(sz + sizeof(metadata) + sizeof(terminator));
     }
 
     if (metaptr) {
         metaptr->checksum = (uintptr_t) metaptr;
         metaptr->size = sz;
         metaptr->freed = false;
-        ptr = metaptr + 1;
 
-        g_stats.ntotal++;
+        ptr = metaptr + 1;
+        
+        memcpy((char*) ptr + sz, terminator, sizeof(terminator));
+
+        ++g_stats.ntotal;
         g_stats.total_size += sz;
-        g_stats.nactive++;
+        ++g_stats.nactive;
         g_stats.active_size += sz;
 
         uintptr_t addr = (uintptr_t) ptr;
@@ -51,7 +58,7 @@ void* m61_malloc(size_t sz, const char* file, long line) {
             g_stats.heap_max = addr + sz - 1;
         }
     } else {
-        g_stats.nfail++;
+        ++g_stats.nfail;
         g_stats.fail_size += sz;
     }
     return ptr;
@@ -67,25 +74,31 @@ void m61_free(void* ptr, const char* file, long line) {
     metadata* metaptr = nullptr;
 
     if (ptr) {
+        // Ensure `ptr` is within range of allocated pointers in heap
         if ((uintptr_t) ptr < g_stats.heap_min || (uintptr_t) ptr > g_stats.heap_max) {
             fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, not in heap\n", file, line, ptr);
             abort();
         }
-
         metaptr = (metadata*) ptr - 1;
 
+        // Ensure `ptr` was allocated earlier
         if (metaptr->checksum != (uintptr_t) metaptr) {
             fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, not allocated\n", file, line, ptr);
             abort();
         }
-
+        // Ensure `ptr` has not already been freed
         if (metaptr->freed) {
             fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, double free\n", file, line, ptr);
             abort();
         }
+        // Check for boundary write errors
+        if (memcmp((char*) ptr + metaptr->size, terminator, sizeof(terminator))) {
+            fprintf(stderr, "MEMORY BUG: %s:%li: detected wild write during free of pointer %p\n", file, line, ptr);
+            abort();
+        }
 
         metaptr->freed = true;
-        g_stats.nactive--;
+        --g_stats.nactive;
         g_stats.active_size -= metaptr->size;
     }
     base_free(metaptr);
@@ -107,9 +120,9 @@ void* m61_calloc(size_t nmemb, size_t sz, const char* file, long line) {
     if (nmemb <= SIZE_MAX / sz) {
         ptr = m61_malloc(nmemb * sz, file, line);
     } else {
-        // Impossible to keep track of fail_size due to oveflow,
+        // Impossible to keep track of fail_size due to overflow,
         // so we only keep track of nfail
-        g_stats.nfail++;
+        ++g_stats.nfail;
     }
     
     if (ptr) {
