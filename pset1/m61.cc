@@ -93,24 +93,43 @@ void m61_free(void* ptr, const char* file, long line) {
     if (ptr) {
         // Ensure `ptr` is within range of allocated pointers in heap
         if ((uintptr_t) ptr < g_stats.heap_min || (uintptr_t) ptr > g_stats.heap_max) {
-            fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, not in heap\n", file, line, ptr);
+            fprintf(stderr, 
+                "MEMORY BUG: %s:%li: invalid free of pointer %p, not in heap\n",
+                file, line, ptr);
             abort();
         }
         metaptr = (metadata*) ptr - 1;
 
         // Ensure `ptr` was allocated earlier
         if (metaptr->checksum != (uintptr_t) metaptr) {
-            fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, not allocated\n", file, line, ptr);
+            fprintf(stderr,
+                "MEMORY BUG: %s:%li: invalid free of pointer %p, not allocated\n",
+                file, line, ptr);
+
+            // Check if `ptr` is inside a different allocated block
+            for (metadata* iterator = front; iterator; iterator = iterator->next) {
+                if (ptr > iterator + 1 && ptr < (char*) (iterator + 1) + iterator->size) {
+                    fprintf(stderr,
+                        "%s:%li: %p is %li bytes inside a %lu byte region allocated here\n",
+                        iterator->file, iterator->line, ptr,
+                        (char*) ptr - (char*) (iterator + 1), iterator->size);
+                }
+            }
+
             abort();
         }
         // Ensure `ptr` has not already been freed
         if (metaptr->freed) {
-            fprintf(stderr, "MEMORY BUG: %s:%li: invalid free of pointer %p, double free\n", file, line, ptr);
+            fprintf(stderr,
+                "MEMORY BUG: %s:%li: invalid free of pointer %p, double free\n",
+                file, line, ptr);
             abort();
         }
         // Check for boundary write errors
         if (memcmp((char*) ptr + metaptr->size, terminator, sizeof(terminator))) {
-            fprintf(stderr, "MEMORY BUG: %s:%li: detected wild write during free of pointer %p\n", file, line, ptr);
+            fprintf(stderr,
+                "MEMORY BUG: %s:%li: detected wild write during free of pointer %p\n",
+                file, line, ptr);
             abort();
         }
 
