@@ -13,9 +13,15 @@ const unsigned char terminator[] = {42, 183, 229, 13};
 struct metadata {
     uintptr_t checksum;
     size_t size;
+    const char* file;
+    long line;
+    metadata* next;
+    metadata* prev;
     bool freed;
     char padding[15];
 };
+
+metadata* front = nullptr;
 
 m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
 
@@ -39,12 +45,23 @@ void* m61_malloc(size_t sz, const char* file, long line) {
     if (metaptr) {
         metaptr->checksum = (uintptr_t) metaptr;
         metaptr->size = sz;
+        metaptr->file = file;
+        metaptr->line = line;
         metaptr->freed = false;
+
+        // Linked list updates
+        if (front) {
+            front->prev = metaptr;
+        }
+        metaptr->next = front;
+        metaptr->prev = nullptr;
+        front = metaptr;
 
         ptr = metaptr + 1;
         
         memcpy((char*) ptr + sz, terminator, sizeof(terminator));
 
+        // Statistics updates
         ++g_stats.ntotal;
         g_stats.total_size += sz;
         ++g_stats.nactive;
@@ -97,7 +114,18 @@ void m61_free(void* ptr, const char* file, long line) {
             abort();
         }
 
+        // Linked list updates
         metaptr->freed = true;
+        if (metaptr->prev) {
+            metaptr->prev->next = metaptr->next;
+        } else {
+            front = metaptr->next;
+        }
+        if (metaptr->next) {
+            metaptr->next->prev = metaptr->prev;
+        }
+
+        // Statistics updates
         --g_stats.nactive;
         g_stats.active_size -= metaptr->size;
     }
@@ -159,7 +187,10 @@ void m61_print_statistics() {
 ///    memory.
 
 void m61_print_leak_report() {
-    // Your code here.
+    for (metadata* metaptr = front; metaptr; metaptr = metaptr->next) {
+        printf("LEAK CHECK: %s:%li: allocated object %p with size %lu\n", 
+            metaptr->file, metaptr->line, metaptr + 1, metaptr->size);
+    }
 }
 
 
