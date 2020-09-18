@@ -6,22 +6,27 @@
 #include <cinttypes>
 #include <cassert>
 
-// Arbitrary sequence of bytes to denote end of allocated memory
-// Lack of obvious pattern to reduce chance of user writing these very bytes
-const unsigned char terminator[] = {42, 183, 229, 13};
-
+/// metadata
+///    Structure to store metadata for each allocation.
+///    This metadata uses 64 bytes of memory per allocation and is
+///    stored internally, immediately before the address of the pointer returned
+///    to the user. The last 15 bytes of padding ensure an alignment of 16.
 struct metadata {
-    uintptr_t checksum;
-    size_t size;
-    const char* file;
-    long line;
-    metadata* next;
-    metadata* prev;
-    bool freed;
-    char padding[15];
+    uintptr_t checksum;    // base address of metadata; acts as checksum
+    size_t size;           // size of requested allocation in bytes
+    const char* file;      // name of file requesting allocation
+    long line;             // line number of call to allocation
+    metadata* next;        // pointer to metadata of next block of allocated memory
+    metadata* prev;        // pointer to metadata of previous block of allocated memory
+    bool freed;            // flag indicating if block has already been freed
+    char padding[15];      // padding to ensure alignment of 16
 };
 
 metadata* front = nullptr;
+
+// Arbitrary sequence of bytes to denote end of allocated memory
+// Lack of obvious pattern to reduce chance of user writing these very bytes
+const unsigned char terminator[] = {42, 183, 229, 13};
 
 m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
 
