@@ -11,6 +11,7 @@
 ///    This metadata uses 64 bytes of memory per allocation and is
 ///    stored internally, immediately before the address of the pointer returned
 ///    to the user. The last 15 bytes of padding ensure an alignment of 16.
+
 struct metadata {
     uintptr_t checksum;    // base address of metadata; acts as checksum
     size_t size;           // size of requested allocation in bytes
@@ -22,6 +23,7 @@ struct metadata {
     char padding[15];      // padding to ensure alignment of 16
 };
 
+// Pointer to front of linked list consisting of metadata units
 metadata* front = nullptr;
 
 // Arbitrary sequence of bytes to denote end of allocated memory
