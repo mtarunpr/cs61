@@ -28,7 +28,17 @@ metadata* front = nullptr;
 // Lack of obvious pattern to reduce chance of user writing these very bytes
 const unsigned char terminator[] = {42, 183, 229, 13};
 
-m61_statistics g_stats = {0, 0, 0, 0, 0, 0, UINTPTR_MAX, 0};
+// Global variable to keep track of allocation stats
+m61_statistics g_stats = {
+    .nactive = 0,
+    .active_size = 0,
+    .ntotal = 0,
+    .total_size = 0,
+    .nfail = 0,
+    .fail_size = 0,
+    .heap_min = UINTPTR_MAX,
+    .heap_max = 0
+};
 
 /// m61_malloc(sz, file, line)
 ///    Return a pointer to `sz` bytes of newly-allocated dynamic memory.
