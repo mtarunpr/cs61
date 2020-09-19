@@ -24,6 +24,7 @@ struct metadata {
 };
 
 // Pointer to front of linked list consisting of metadata units
+// This linked list will be used to check for memory leaks
 metadata* front = nullptr;
 
 // Arbitrary sequence of bytes to denote end of allocated memory
@@ -118,7 +119,7 @@ void m61_free(void* ptr, const char* file, long line) {
         metaptr = (metadata*) ptr - 1;
 
         // Ensure `ptr` was allocated earlier
-        if (metaptr->checksum != (uintptr_t) metaptr) {
+        if ((uintptr_t) metaptr % alignof(max_align_t) != 0 || metaptr->checksum != (uintptr_t) metaptr) {
             fprintf(stderr,
                 "MEMORY BUG: %s:%li: invalid free of pointer %p, not allocated\n",
                 file, line, ptr);
