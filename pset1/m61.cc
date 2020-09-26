@@ -326,17 +326,14 @@ void m61_print_heavy_hitter_report_helper(bool heavy) {
     counter_t* counters = nullptr;
     size_t decr;
     unsigned long long total;
-    char type[9];
     if (heavy) {
         counters = size_counters;
         decr = size_decr;
         total = g_stats.total_size;
-        strcpy(type, "HEAVY");
     } else {
         counters = freq_counters;
         decr = freq_decr;
         total = g_stats.ntotal;
-        strcpy(type, "FREQUENT");
     }
     std::sort(counters, counters + n_counters, compare);
     for (short i = 0; i < n_counters; ++i) {
@@ -345,8 +342,9 @@ void m61_print_heavy_hitter_report_helper(bool heavy) {
             size_t estimated_count = counters[i].second + decr;
             double percentage = (double) estimated_count / total * 100;
             if (percentage >= 20.0) {
-                printf("%s HITTER: %s:%li: %lu bytes (~%0.1f%%)\n",
-                    type, counters[i].first.first.c_str(),
+                printf(heavy ? "HEAVY HITTER: %s:%li: %lu bytes (~%0.1f%%)\n"
+                    : "FREQUENT HITTER: %s:%li: %lu allocations (~%0.1f%%)\n",
+                    counters[i].first.first.c_str(),
                     counters[i].first.second, estimated_count, percentage);
             }
         }
