@@ -10,6 +10,8 @@
 #include <algorithm>
 
 // Counter type to store counters for heavy hitters
+// `counter_t` is a pair whose first element stores
+// (filename, line) and whose second element stores the count
 typedef std::pair<std::pair<std::string, long>, size_t> counter_t;
 
 /// metadata
@@ -50,11 +52,71 @@ m61_statistics g_stats = {
 };
 
 // Heavy hitters globals
-// `counters` is an array of pairs; the first element at each index
-// stores (filename, line) and the second stores the count
 const short n_counters = 5;
-counter_t counters[n_counters];
-size_t decr = 0;
+counter_t size_counters[n_counters];
+counter_t freq_counters[n_counters];
+size_t size_decr = 0;
+size_t freq_decr = 0;
+
+
+/// update_heavy_hitters(counters, decr, sz, file, line)
+///    Updates heavy hitter data.
+///    Implementation based on Algorithm FREQUENT, as defined in
+///    Frequency Estimation of Internet Packet Streams with Limited Space,
+///    Demaine, López-Ortiz, and Munro.
+
+void update_heavy_hitters(counter_t counters[], size_t* decr, size_t sz, const char* file, long line) {
+    short index = -1;   // index of counter monitoring this allocation
+    // Check if already monitored
+    for (short i = 0; i < n_counters; ++i) {
+        if (counters[i].first == make_pair((std::string) file, line)) {
+            index = i;
+        }
+    }
+    // If not, check if some counter is zero
+    if (index == -1) {
+        for (short i = 0; i < n_counters; ++i) {
+            if (counters[i].second == 0) {
+                // Define this to be monitored element at index `i`
+                counters[i].first = make_pair((std::string) file, line);
+                index = i;
+            }
+        }
+    }
+    // If now monitored, increment counter
+    if (index != -1) {
+        counters[index].second += sz;
+    } else {
+        // Otherwise, decrement every counter
+        size_t min_idx = 0;
+        // Find index of minimum count
+        for (short i = 1; i < n_counters; ++i) {
+            if (counters[i].second < counters[min_idx].second) {
+                min_idx = i;
+            }
+        }
+        // If count is high enough, decrement all by `sz`
+        if (sz <= counters[min_idx].second) {
+            for (short i = 0; i < n_counters; ++i) {
+                counters[i].second -= sz;
+            }
+            *decr += sz;
+        } else {
+            // Otherwise, only decrement all by the min count
+            // to avoid entering negative counts
+            // NOTE: Frequency updates should never enter this else branch
+            for (short i = 0; i < n_counters; ++i) {
+                counters[i].second -= counters[min_idx].second;
+            }
+            *decr += counters[min_idx].second;
+            // Then simulate monitoring this allocation
+            // and incrementing its count by the remaining bytes
+            counters[min_idx].first = make_pair((std::string) file, line);
+            counters[min_idx].second += sz - counters[min_idx].second;
+        }
+    }
+}
+
 
 /// m61_malloc(sz, file, line)
 ///    Return a pointer to `sz` bytes of newly-allocated dynamic memory.
@@ -106,55 +168,9 @@ void* m61_malloc(size_t sz, const char* file, long line) {
             g_stats.heap_max = addr + sz - 1;
         }
 
-        // Heavy hitters updates: uses Algorithm FREQUENT
-        short index = -1;   // index of counter monitoring this allocation
-        // Check if already monitored
-        for (short i = 0; i < n_counters; ++i) {
-            if (counters[i].first == make_pair((std::string) file, line)) {
-                index = i;
-            }
-        }
-        // If not, check if some counter is zero
-        if (index == -1) {
-            for (short i = 0; i < n_counters; ++i) {
-                if (counters[i].second == 0) {
-                    // Define this to be monitored element at index `i`
-                    counters[i].first = make_pair((std::string) file, line);
-                    index = i;
-                }
-            }
-        }
-        // If now monitored, increment counter
-        if (index != -1) {
-            counters[index].second += sz;
-        } else {
-            // Otherwise, decrement every counter
-            size_t min_idx = 0;
-            // Find index of minimum count
-            for (short i = 1; i < n_counters; ++i) {
-                if (counters[i].second < counters[min_idx].second) {
-                    min_idx = i;
-                }
-            }
-            // If count is high enough, decrement all by `sz`
-            if (sz <= counters[min_idx].second) {
-                for (short i = 0; i < n_counters; ++i) {
-                    counters[i].second -= sz;
-                }
-                decr += sz;
-            } else {
-                // Otherwise, only decrement all by the min count
-                // to avoid entering negative counts
-                for (short i = 0; i < n_counters; ++i) {
-                    counters[i].second -= counters[min_idx].second;
-                }
-                decr += counters[min_idx].second;
-                // Then simulate monitoring this allocation
-                // and incrementing its count by the remaining bytes
-                counters[min_idx].first = make_pair((std::string) file, line);
-                counters[min_idx].second += sz - counters[min_idx].second;
-            }
-        }
+        // Heavy hitters updates
+        update_heavy_hitters(size_counters, &size_decr, sz, file, line);  // size
+        update_heavy_hitters(freq_counters, &freq_decr, 1, file, line);   // frequency
     } else {
         ++g_stats.nfail;
         g_stats.fail_size += sz;
@@ -300,24 +316,47 @@ bool compare(counter_t counter1, counter_t counter2) {
     return counter1.second > counter2.second;
 }
 
-/// m61_print_heavy_hitter_report()
-///    Print a report of heavily-used allocation locations.
-///    Implementation based on Algorithm FREQUENT, as defined in
-///    Frequency Estimation of Internet Packet Streams with Limited Space,
-///    Demaine, López-Ortiz, and Munro.
+/// m61_print_heavy_hitter_report_helper(heavy)
+///    Helper function that abstracts out behavior
+///    common to both heavy hitter reports and frequent
+///    hitter reports. Prints heavy hitter reports if `heavy` is 
+///    true, or frequent hitter reports otherwise.
 
-void m61_print_heavy_hitter_report() {
+void m61_print_heavy_hitter_report_helper(bool heavy) {
+    counter_t* counters = nullptr;
+    size_t decr;
+    unsigned long long total;
+    char type[9];
+    if (heavy) {
+        counters = size_counters;
+        decr = size_decr;
+        total = g_stats.total_size;
+        strcpy(type, "HEAVY");
+    } else {
+        counters = freq_counters;
+        decr = freq_decr;
+        total = g_stats.ntotal;
+        strcpy(type, "FREQUENT");
+    }
     std::sort(counters, counters + n_counters, compare);
     for (short i = 0; i < n_counters; ++i) {
         // Ensure positive count
         if (counters[i].second > 0) {
-            size_t estimated_bytes = counters[i].second + decr;
-            double percentage = (double) estimated_bytes / g_stats.total_size * 100;
+            size_t estimated_count = counters[i].second + decr;
+            double percentage = (double) estimated_count / total * 100;
             if (percentage >= 20.0) {
-                printf("HEAVY HITTER: %s:%li: %lu bytes (~%0.1f%%)\n",
-                    counters[i].first.first.c_str(), counters[i].first.second,
-                    estimated_bytes, percentage);
+                printf("%s HITTER: %s:%li: %lu bytes (~%0.1f%%)\n",
+                    type, counters[i].first.first.c_str(),
+                    counters[i].first.second, estimated_count, percentage);
             }
         }
     }
+}
+
+/// m61_print_heavy_hitter_report()
+///    Print a report of heavily-used allocation locations.
+
+void m61_print_heavy_hitter_report() {
+    m61_print_heavy_hitter_report_helper(true);   // print heavy hitter reports
+    m61_print_heavy_hitter_report_helper(false);  // print frequent hitter reports
 }
