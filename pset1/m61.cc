@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cinttypes>
 #include <cassert>
+#include <utility>
+#include <string>
 
 /// metadata
 ///    Structure to store metadata for each allocation.
@@ -42,6 +44,12 @@ m61_statistics g_stats = {
     .heap_min = UINTPTR_MAX,
     .heap_max = 0
 };
+
+// Heavy hitters globals
+const short n_counters = 5;
+std::pair<std::string, long> monitors[n_counters];   // monitored locations
+size_t counts[n_counters] = {};   // initializes counts to zeros
+size_t decr = 0;
 
 /// m61_malloc(sz, file, line)
 ///    Return a pointer to `sz` bytes of newly-allocated dynamic memory.
@@ -91,6 +99,45 @@ void* m61_malloc(size_t sz, const char* file, long line) {
         }
         if (addr + sz - 1 > g_stats.heap_max) {
             g_stats.heap_max = addr + sz - 1;
+        }
+
+        // Heavy hitters updates: uses Algorithm FREQUENT
+        short index = -1;   // index of counter monitoring this allocation
+        for (short i = 0; i < n_counters; ++i) {
+            if (monitors[i] == make_pair((std::string) file, line)) {
+                index = i;
+            }
+        }
+        if (index == -1) {
+            for (short i = 0; i < n_counters; ++i) {
+                if (counts[i] == 0) {
+                    monitors[i] = make_pair((std::string) file, line);
+                    index = i;
+                }
+            }
+        }
+        if (index != -1) {
+            counts[index] += sz;
+        } else {
+            size_t min_idx = 0;
+            for (short i = 1; i < n_counters; ++i) {
+                if (counts[i] < counts[min_idx]) {
+                    min_idx = i;
+                }
+            }
+            if (sz <= counts[min_idx]) {
+                for (short i = 1; i < n_counters; ++i) {
+                    counts[i] -= sz;
+                }
+                decr += sz;
+            } else {
+                for (short i = 1; i < n_counters; ++i) {
+                    counts[i] -= counts[min_idx];
+                }
+                decr += counts[min_idx];
+                monitors[min_idx] = make_pair((std::string) file, line);
+                counts[min_idx] += sz;
+            }
         }
     } else {
         ++g_stats.nfail;
@@ -233,7 +280,15 @@ void m61_print_leak_report() {
 
 /// m61_print_heavy_hitter_report()
 ///    Print a report of heavily-used allocation locations.
+///    Implementation based on Algorithm FREQUENT, as defined in
+///    Frequency Estimation of Internet Packet Streams with Limited Space,
+///    Demaine, López-Ortiz, and Munro.
 
 void m61_print_heavy_hitter_report() {
-    // Your heavy-hitters code here
+    for (short i = 0; i < n_counters; ++i) {
+        size_t estimated_bytes = counts[i] + decr;
+        double percentage = (double) estimated_bytes / g_stats.total_size * 100;
+        printf("HEAVY HITTER: %s:%li: %lu bytes (~%0.1f%%)\n",
+            monitors[i].first.c_str(), monitors[i].second, estimated_bytes, percentage);
+    }
 }

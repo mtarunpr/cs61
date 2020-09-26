@@ -13,4 +13,4 @@ Received helpful style/design suggestions (e.g., to use a single struct instance
 
 Citations
 ---------
-None.
+Demaine, E. D., López-Ortiz, A., & Munro, J. I. (2002, September). Frequency estimation of internet packet streams with limited space. In *European Symposium on Algorithms* (pp. 348-360). Springer, Berlin, Heidelberg.
