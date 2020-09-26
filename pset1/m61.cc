@@ -7,6 +7,10 @@
 #include <cassert>
 #include <utility>
 #include <string>
+#include <algorithm>
+
+// Counter type to store counters for heavy hitters
+typedef std::pair<std::pair<std::string, long>, size_t> counter_t;
 
 /// metadata
 ///    Structure to store metadata for each allocation.
@@ -46,9 +50,10 @@ m61_statistics g_stats = {
 };
 
 // Heavy hitters globals
+// `counters` is an array of pairs; the first element at each index
+// stores (filename, line) and the second stores the count
 const short n_counters = 5;
-std::pair<std::string, long> monitors[n_counters];   // monitored locations
-size_t counts[n_counters] = {};   // initializes counts to zeros
+counter_t counters[n_counters];
 size_t decr = 0;
 
 /// m61_malloc(sz, file, line)
@@ -103,40 +108,51 @@ void* m61_malloc(size_t sz, const char* file, long line) {
 
         // Heavy hitters updates: uses Algorithm FREQUENT
         short index = -1;   // index of counter monitoring this allocation
+        // Check if already monitored
         for (short i = 0; i < n_counters; ++i) {
-            if (monitors[i] == make_pair((std::string) file, line)) {
+            if (counters[i].first == make_pair((std::string) file, line)) {
                 index = i;
             }
         }
+        // If not, check if some counter is zero
         if (index == -1) {
             for (short i = 0; i < n_counters; ++i) {
-                if (counts[i] == 0) {
-                    monitors[i] = make_pair((std::string) file, line);
+                if (counters[i].second == 0) {
+                    // Define this to be monitored element at index `i`
+                    counters[i].first = make_pair((std::string) file, line);
                     index = i;
                 }
             }
         }
+        // If now monitored, increment counter
         if (index != -1) {
-            counts[index] += sz;
+            counters[index].second += sz;
         } else {
+            // Otherwise, decrement every counter
             size_t min_idx = 0;
+            // Find index of minimum count
             for (short i = 1; i < n_counters; ++i) {
-                if (counts[i] < counts[min_idx]) {
+                if (counters[i].second < counters[min_idx].second) {
                     min_idx = i;
                 }
             }
-            if (sz <= counts[min_idx]) {
-                for (short i = 1; i < n_counters; ++i) {
-                    counts[i] -= sz;
+            // If count is high enough, decrement all by `sz`
+            if (sz <= counters[min_idx].second) {
+                for (short i = 0; i < n_counters; ++i) {
+                    counters[i].second -= sz;
                 }
                 decr += sz;
             } else {
-                for (short i = 1; i < n_counters; ++i) {
-                    counts[i] -= counts[min_idx];
+                // Otherwise, only decrement all by the min count
+                // to avoid entering negative counts
+                for (short i = 0; i < n_counters; ++i) {
+                    counters[i].second -= counters[min_idx].second;
                 }
-                decr += counts[min_idx];
-                monitors[min_idx] = make_pair((std::string) file, line);
-                counts[min_idx] += sz;
+                decr += counters[min_idx].second;
+                // Then simulate monitoring this allocation
+                // and incrementing its count by the remaining bytes
+                counters[min_idx].first = make_pair((std::string) file, line);
+                counters[min_idx].second += sz - counters[min_idx].second;
             }
         }
     } else {
@@ -277,6 +293,12 @@ void m61_print_leak_report() {
     }
 }
 
+/// compare(counter1, counter2)
+///    Compare function for sorting `counter_t` arrays.
+
+bool compare(counter_t counter1, counter_t counter2) {
+    return counter1.second > counter2.second;
+}
 
 /// m61_print_heavy_hitter_report()
 ///    Print a report of heavily-used allocation locations.
@@ -285,10 +307,17 @@ void m61_print_leak_report() {
 ///    Demaine, López-Ortiz, and Munro.
 
 void m61_print_heavy_hitter_report() {
+    std::sort(counters, counters + n_counters, compare);
     for (short i = 0; i < n_counters; ++i) {
-        size_t estimated_bytes = counts[i] + decr;
-        double percentage = (double) estimated_bytes / g_stats.total_size * 100;
-        printf("HEAVY HITTER: %s:%li: %lu bytes (~%0.1f%%)\n",
-            monitors[i].first.c_str(), monitors[i].second, estimated_bytes, percentage);
+        // Ensure positive count
+        if (counters[i].second > 0) {
+            size_t estimated_bytes = counters[i].second + decr;
+            double percentage = (double) estimated_bytes / g_stats.total_size * 100;
+            if (percentage >= 20.0) {
+                printf("HEAVY HITTER: %s:%li: %lu bytes (~%0.1f%%)\n",
+                    counters[i].first.first.c_str(), counters[i].first.second,
+                    estimated_bytes, percentage);
+            }
+        }
     }
 }
