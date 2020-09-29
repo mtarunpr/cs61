@@ -1,22 +1,23 @@
-	.section	__TEXT,__text,regular,pure_instructions
-	.build_version macos, 10, 15	sdk_version 10, 15, 6
-	.globl	__Z1fllllll             ## -- Begin function _Z1fllllll
-__Z1fllllll:                            ## @_Z1fllllll
-## %bb.0:
-	pushq	%rbp
-	movq	%rsp, %rbp
-	subq	$32, %rsp
-	movl	%edi, -32(%rbp)
-	movl	%esi, -28(%rbp)
-	movl	%edx, -24(%rbp)
-	movl	%ecx, -20(%rbp)
-	movl	%r8d, -16(%rbp)
-	movl	%r9d, -12(%rbp)
-	leaq	-8(%rbp), %rsi
-	leaq	-32(%rbp), %rdi
-	callq	__Z13process_arrayPKiS0_
-	addq	$32, %rsp
-	popq	%rbp
-	retq
-                                        ## -- End function
-.subsections_via_symbols
+	.file	"f19.cc"
+	.text
+	.globl	_Z1fllllll
+	.type	_Z1fllllll, @function
+_Z1fllllll:
+.LFB0:
+	endbr64
+	subq	$40, %rsp
+	movl	%edi, (%rsp)
+	movl	%esi, 4(%rsp)
+	movl	%edx, 8(%rsp)
+	movl	%ecx, 12(%rsp)
+	movl	%r8d, 16(%rsp)
+	movl	%r9d, 20(%rsp)
+	movq	%rsp, %rdi
+	leaq	24(%rsp), %rsi
+	call	_Z13process_arrayPKiS0_@PLT
+	addq	$40, %rsp
+	ret
+.LFE0:
+	.size	_Z1fllllll, .-_Z1fllllll
+	.ident	"GCC: (Ubuntu 9.3.0-10ubuntu2) 9.3.0"
+	.section	.note.GNU-stack,"",@progbits
