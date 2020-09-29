@@ -269,7 +269,7 @@ Disassembly of section .text:
   400f3d:	00 00 00 
 
 0000000000400f40 <_GLOBAL__sub_I_infile>:
-  400f40:	48 8b 05 79 27 20 00 	mov    0x202779(%rip),%rax        # 6036c0 <stdin@@GLIBC_2.2.5>
+      400f40:	48 8b 05 79 27 20 00 	mov    0x202779(%rip),%rax        # 6036c0 <stdin@@GLIBC_2.2.5>
   400f47:	55                   	push   %rbp
   400f48:	48 89 e5             	mov    %rsp,%rbp
   400f4b:	48 89 05 8e 27 20 00 	mov    %rax,0x20278e(%rip)        # 6036e0 <infile>
@@ -453,46 +453,46 @@ Disassembly of section .text:
   40114e:	49 89 fe             	mov    %rdi,%r14
   401151:	49 89 d4             	mov    %rdx,%r12
   401154:	48 81 ec b0 00 00 00 	sub    $0xb0,%rsp
-  40115b:	e8 60 fb ff ff       	callq  400cc0 <strlen@plt>
+  40115b:	e8 60 fb ff ff       	callq  400cc0 <strlen@plt> # 5
   401160:	48 89 df             	mov    %rbx,%rdi
   401163:	49 89 c5             	mov    %rax,%r13
-  401166:	e8 55 fb ff ff       	callq  400cc0 <strlen@plt>
+  401166:	e8 55 fb ff ff       	callq  400cc0 <strlen@plt> # length of second part, which must be longer
   40116b:	49 39 c5             	cmp    %rax,%r13
   40116e:	0f 83 a1 00 00 00    	jae    401215 <_Z4playPKcPcS1_+0xd5>
-  401174:	4c 89 ea             	mov    %r13,%rdx
+  401174:	4c 89 ea             	mov    %r13,%rdx           # use smaller length for memcmp
   401177:	48 89 de             	mov    %rbx,%rsi
   40117a:	4c 89 f7             	mov    %r14,%rdi
   40117d:	e8 1e fc ff ff       	callq  400da0 <memcmp@plt>
   401182:	85 c0                	test   %eax,%eax
-  401184:	0f 85 8b 00 00 00    	jne    401215 <_Z4playPKcPcS1_+0xd5>
-  40118a:	4d 85 ed             	test   %r13,%r13
-  40118d:	4e 8d 34 2b          	lea    (%rbx,%r13,1),%r14
+  401184:	0f 85 8b 00 00 00    	jne    401215 <_Z4playPKcPcS1_+0xd5>        # Ensure both strings have equal length
+  40118a:	4d 85 ed             	test   %r13,%r13 # 5
+  40118d:	4e 8d 34 2b          	lea    (%rbx,%r13,1),%r14           # second part + 5 -> store in r14
   401191:	74 0d                	je     4011a0 <_Z4playPKcPcS1_+0x60>
-  401193:	41 0f b6 3e          	movzbl (%r14),%edi
-  401197:	e8 14 fc ff ff       	callq  400db0 <isspace@plt>
+  401193:	41 0f b6 3e          	movzbl (%r14),%edi                  # store the byte at second part + 5 in rdi
+  401197:	e8 14 fc ff ff       	callq  400db0 <isspace@plt>         # the byte at second part + 5 must be space
   40119c:	85 c0                	test   %eax,%eax
   40119e:	74 75                	je     401215 <_Z4playPKcPcS1_+0xd5>
-  4011a0:	48 8d 8d 3c ff ff ff 	lea    -0xc4(%rbp),%rcx
+  4011a0:	48 8d 8d 3c ff ff ff 	lea    -0xc4(%rbp),%rcx      # address at which number of sscanf'ed bytes is stored
   4011a7:	31 c0                	xor    %eax,%eax
-  4011a9:	4c 89 e2             	mov    %r12,%rdx
-  4011ac:	be fc 23 40 00       	mov    $0x4023fc,%esi
-  4011b1:	4c 89 f7             	mov    %r14,%rdi
+  4011a9:	4c 89 e2             	mov    %r12,%rdx             # beginning of the 176 bytes
+  4011ac:	be fc 23 40 00       	mov    $0x4023fc,%esi        #  %[a-z]%n
+  4011b1:	4c 89 f7             	mov    %r14,%rdi             # second part + 5
   4011b4:	e8 37 fb ff ff       	callq  400cf0 <sscanf@plt>
-  4011b9:	83 f8 01             	cmp    $0x1,%eax
+  4011b9:	83 f8 01             	cmp    $0x1,%eax             # sscanf should only set 1 string (at r12's address)
   4011bc:	75 57                	jne    401215 <_Z4playPKcPcS1_+0xd5>
-  4011be:	48 63 b5 3c ff ff ff 	movslq -0xc4(%rbp),%rsi
-  4011c5:	4c 01 ee             	add    %r13,%rsi
-  4011c8:	48 01 de             	add    %rbx,%rsi
-  4011cb:	0f b6 16             	movzbl (%rsi),%edx
-  4011ce:	84 d2                	test   %dl,%dl
+  4011be:	48 63 b5 3c ff ff ff 	movslq -0xc4(%rbp),%rsi      # address at which number of sscanf'ed bytes is stored
+  4011c5:	4c 01 ee             	add    %r13,%rsi             # adds strlen of first string (here empty) to num bytes
+  4011c8:	48 01 de             	add    %rbx,%rsi             # rsi now points to just after what was read
+  4011cb:	0f b6 16             	movzbl (%rsi),%edx           # moves the next byte after what was read into edx
+  4011ce:	84 d2                	test   %dl,%dl               # If next byte was null byte, return (bad if rax < 5)
   4011d0:	74 33                	je     401205 <_Z4playPKcPcS1_+0xc5>
-  4011d2:	80 fa 2c             	cmp    $0x2c,%dl
+  4011d2:	80 fa 2c             	cmp    $0x2c,%dl             # If the next byte was not comma, explode (always bad)
   4011d5:	75 3e                	jne    401215 <_Z4playPKcPcS1_+0xd5>
   4011d7:	48 8d 95 40 ff ff ff 	lea    -0xc0(%rbp),%rdx
-  4011de:	c6 06 00             	movb   $0x0,(%rsi)
-  4011e1:	48 89 df             	mov    %rbx,%rdi
-  4011e4:	48 83 c6 01          	add    $0x1,%rsi
-  4011e8:	e8 53 ff ff ff       	callq  401140 <_Z4playPKcPcS1_>
+  4011de:	c6 06 00             	movb   $0x0,(%rsi)           # Replace comma with null byte
+  4011e1:	48 89 df             	mov    %rbx,%rdi             # Beginning of input string
+  4011e4:	48 83 c6 01          	add    $0x1,%rsi             # rsi points to after the null byte
+  4011e8:	e8 53 ff ff ff       	callq  401140 <_Z4playPKcPcS1_>        # Recurse with input string, pointer to just after "peach,", and pointer
   4011ed:	48 8d bd 40 ff ff ff 	lea    -0xc0(%rbp),%rdi
   4011f4:	4c 89 e6             	mov    %r12,%rsi
   4011f7:	89 c3                	mov    %eax,%ebx
@@ -513,19 +513,19 @@ Disassembly of section .text:
 0000000000401220 <_Z7phase_4Pc>:
   401220:	55                   	push   %rbp
   401221:	48 89 fe             	mov    %rdi,%rsi
-  401224:	bf da 29 40 00       	mov    $0x4029da,%edi
+  401224:	bf da 29 40 00       	mov    $0x4029da,%edi        # empty string
   401229:	48 89 e5             	mov    %rsp,%rbp
   40122c:	53                   	push   %rbx
   40122d:	48 8d 95 50 ff ff ff 	lea    -0xb0(%rbp),%rdx
   401234:	48 81 ec a8 00 00 00 	sub    $0xa8,%rsp
-  40123b:	e8 00 ff ff ff       	callq  401140 <_Z4playPKcPcS1_>
+  40123b:	e8 00 ff ff ff       	callq  401140 <_Z4playPKcPcS1_>        # args are empty string, input string, pointer to 176 bytes of memory
   401240:	48 8d bd 50 ff ff ff 	lea    -0xb0(%rbp),%rdi
   401247:	89 c3                	mov    %eax,%ebx
-  401249:	be 06 24 40 00       	mov    $0x402406,%esi
+  401249:	be 06 24 40 00       	mov    $0x402406,%esi        # peach
   40124e:	e8 2d fb ff ff       	callq  400d80 <strcmp@plt>
-  401253:	83 fb 04             	cmp    $0x4,%ebx
+  401253:	83 fb 04             	cmp    $0x4,%ebx             # value returned by play must be >4
   401256:	7e 0e                	jle    401266 <_Z7phase_4Pc+0x46>
-  401258:	85 c0                	test   %eax,%eax
+  401258:	85 c0                	test   %eax,%eax             # rdi value must point to peach
   40125a:	75 0a                	jne    401266 <_Z7phase_4Pc+0x46>
   40125c:	48 81 c4 a8 00 00 00 	add    $0xa8,%rsp
   401263:	5b                   	pop    %rbx
