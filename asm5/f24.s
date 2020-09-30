@@ -5,9 +5,9 @@
 _Z1f2s1iS_:
 .LFB0:
 	endbr64
-	addl	%edi, %edx
-	sarq	$32, %rcx
-	leal	(%rdx,%rcx), %eax
+	addl	%edi, %esi
+	sarq	$32, %rdx
+	leal	(%rsi,%rdx), %eax
 	salq	$32, %rax
 	ret
 .LFE0:

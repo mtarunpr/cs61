@@ -7,8 +7,6 @@
 struct s1 {
     int first = 0;
     int second = 0;
-    int x1 = 0;
-    int x2 = 0;
 };
 
 struct s2 {
