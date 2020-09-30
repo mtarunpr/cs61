@@ -2,7 +2,7 @@ BUILDABLEASM := $(sort $(patsubst %.cc,%.s,$(wildcard f*.cc)) \
 	$(patsubst src/%.cc,%.s,$(wildcard src/f*.cc)))
 ALLASM := $(sort $(BUILDABLEASM) $(wildcard f*.s))
 ASMOBJECTS := $(patsubst %.s,%.o,$(ALLASM))
-ASMPROGRAMS := $(sort $(patsubst %.s,%,$(patsubst %.cc,%,$(patsubst src/%,%,$(shell grep -l main $(wildcard f*.s f*.cc src/f*.cc))))))
+ASMPROGRAMS := $(sort $(patsubst %.s,%,$(patsubst %.cc,%,$(patsubst src/%,%,$(shell grep -l main $(wildcard f*.s f*.cc src/f*.cc /dev/null))))))
 DEFAULT_ASM_CXXFLAGS = $(O)
 DEFAULT_ASM_CXXFLAGS_DEBUG = -g $(DEFAULT_ASM_CXXFLAGS)
 PROGRAMS = $(ASMPROGRAMS)
