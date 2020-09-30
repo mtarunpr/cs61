@@ -1,0 +1,9 @@
+allf[cs].txt
+f[0-9][0-9]
+f[0-9][0-9][a-z]
+stringrep
+stringrep.s
+vectorrep
+vectorrep.s
+*.asm
+*-unsafe
