@@ -9,13 +9,12 @@ Advance work
 *Advance work should be completed before lecture, especially by active
 listeners. There is nothing to turn in.*
 
-1\. The function in `src/f28.cc` is recursive. Try to create many different
-compiled versions using different optimization and compilation flags. For
-example, try `make O=1` to build `f28.s` with `-O1`, or `make O=0
-COMPILER=clang` to build it with `-O0` and the `clang++` compiler.
+1\. The function in `src/f28.cc` is recursive. Look at the function and
+understand what it does.
 
-We are able to find the following compiled versions; can you find these, and
-maybe more?
+2\. Create a couple different compiled versions using different optimization
+and compilation flags. We found the following compiled versions; can you find
+at least three of these? (Even better, can you find *all* of them, and more?)
 
 * A version containing a recursive call.
 * A version containing a loop.
@@ -31,7 +30,9 @@ trying to understand why the assembly correctly implements the function. (That
 said, course staff have no idea why the `%xmm0` version correctly implements
 the function.)
 
-The main flags that you will use are the following. The flags can be combined.
+The main flags that you will use are the following. The flags can be combined;
+for instance, `make COMPILER=gcc O=0` builds with the g++ compiler and no
+optimization.
 
 * `make COMPILER=gcc`: Build with [the g++ compiler](https://gcc.gnu.org/).
 * `make COMPILER=clang`: Build with [the clang++ compiler](https://clang.llvm.org/).
@@ -51,9 +52,8 @@ The main flags that you will use are the following. The flags can be combined.
 * `make O=z` (`COMPILER=clang` only): Build with the `-Oz` flag, which is like
   `-Os` but tries to reduce instruction count even more.
 
-It is also possible to control optimization in an even more fine-grained way
-by supplying [optimization
-flags](https://gcc.gnu.org/onlinedocs/gcc-9.3.0/gcc/Optimize-Options.html).
+Optimization can be controlled in an even more fine-grained way by supplying
+[optimization flags](https://gcc.gnu.org/onlinedocs/gcc-9.3.0/gcc/Optimize-Options.html).
 Our makefiles support this by the `CXXFLAGS=` parameter. Go nuts if you’d
 like. The following options may be interesting:
 

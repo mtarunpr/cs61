@@ -3,7 +3,7 @@ BUILDABLEASM := $(sort $(patsubst %.cc,%.s,$(wildcard f*.cc)) \
 ALLASM := $(sort $(BUILDABLEASM) $(wildcard f*.s))
 ASMOBJECTS := $(patsubst %.s,%.o,$(ALLASM))
 ASMPROGRAMS := $(sort $(patsubst %.s,%,$(patsubst %.cc,%,$(patsubst src/%,%,$(shell grep -l main $(wildcard f*.s f*.cc src/f*.cc))))))
-DEFAULT_ASM_CXXFLAGS = -O1
+DEFAULT_ASM_CXXFLAGS = $(O)
 DEFAULT_ASM_CXXFLAGS_DEBUG = -g $(DEFAULT_ASM_CXXFLAGS)
 PROGRAMS = $(ASMPROGRAMS)
 
@@ -16,7 +16,7 @@ variants = $(1) $(addsuffix -unsafe,$(1)) $(addsuffix -O0,$(1))
 
 COMPILER ?= gcc
 PIE ?= 0
-O ?= 3
+O ?= 1
 include ../common/rules.mk
 
 UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
@@ -38,13 +38,13 @@ UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
 	$(call flagged_compile_S,$<,$@,$(CXXFLAGS))
 
 %.s: src/%.cc GNUmakefile $(BUILDSTAMP)
-	$(call flagged_compile_S,$<,$@,$(CXXFLAGS))
+	$(call flagged_compile_S,$<,$@,-I. $(CXXFLAGS))
 
 %-unsafe.s: %.cc GNUmakefile $(BUILDSTAMP)
 	$(call flagged_compile_S,$<,$@,$(UNSAFEFLAGS) $(CXXFLAGS))
 
 %-unsafe.s: src/%.cc GNUmakefile $(BUILDSTAMP)
-	$(call flagged_compile_S,$<,$@,$(UNSAFEFLAGS) $(CXXFLAGS))
+	$(call flagged_compile_S,$<,$@,-I. $(UNSAFEFLAGS) $(CXXFLAGS))
 
 %.asm: %.o
 	objdump -d $< > $@
@@ -58,6 +58,7 @@ $(ASMOBJECTS): %.o: %.s $(BUILDSTAMP)
 
 $(ASMPROGRAMS): %: %.o hexdump.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -o $@ $^
+	@if grep -l '^//@disassemble' src/$@.cc >/dev/null 2>&1; then objdump --disassemble=`grep '^//@disassemble' src/$@.cc | cut -d ' ' -f 2` $@ > $@.s; fi
 
 
 allfc.txt: always
@@ -69,11 +70,8 @@ allfs.txt: $(ALLASM) always
 	    echo $$i; echo ========; cat $$i; echo; echo; done > allfs.txt
 
 
-clean:
-	rm -rf $(call variants,$(PROGRAMS)) *.o $(DEPSDIR)
-
-cleanasm: clean
-	rm -f $(BUILDABLEASM)
+cleanasm clean:
+	rm -rf $(call variants,$(PROGRAMS)) *.o $(DEPSDIR) $(BUILDABLEASM)
 
 .PHONY: all clean cleanasm asm
 .PRECIOUS: %-O0.o %-O1.o %-unsafe.o %-unsafe.s

@@ -3,7 +3,7 @@ CFLAGS := -std=gnu11 -W -Wall -Wshadow -g $(DEFS) $(CFLAGS)
 CXXFLAGS := -std=gnu++1z -W -Wall -Wshadow -g $(DEFS) $(CXXFLAGS)
 
 O ?= -O3
-ifeq ($(filter 0 1 2 3 s,$(O)),$(strip $(O)))
+ifeq ($(filter 0 1 2 3 s z g fast,$(O)),$(strip $(O)))
 override O := -O$(O)
 endif
 
@@ -125,7 +125,7 @@ CXX_LINK_PREREQUISITES = $(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -o $@ $^
 
 CLEANASM = 1
 ifeq ($(CLEANASM),1)
-cleanasm = perl -ni -e '$$badsection = !!/\.note\.gnu/ if /^\s+\.section/; print if !/^(?:\# BB|\s+\.cfi|\s+\.p2align|\s+\# =>This)/ && !$$badsection' $(1)
+cleanasm = perl -ni -e '$$badsection = !!/\.note\.gnu/ if /^\s+\.section/; print if !/^(?:\# BB|\s+\.cfi|\s+\.p2align|\s+\# =>This|\s+\# kill)/ && !$$badsection' $(1)
 else
 cleanasm = :
 endif

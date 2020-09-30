@@ -5,10 +5,12 @@
 _Z1fPKc:
 .LFB30:
 	endbr64
-	subq	$8, %rsp
+	pushq	%rbx
+	movq	%rdi, %rbx
+.L2:
+	movq	%rbx, %rdi
 	call	puts@PLT
-	addq	$8, %rsp
-	ret
+	jmp	.L2
 .LFE30:
 	.size	_Z1fPKc, .-_Z1fPKc
 	.ident	"GCC: (Ubuntu 9.3.0-10ubuntu2) 9.3.0"
