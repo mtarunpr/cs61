@@ -16,7 +16,7 @@ variants = $(1) $(addsuffix -unsafe,$(1)) $(addsuffix -O0,$(1))
 
 COMPILER ?= gcc
 PIE ?= 0
-O ?= 1
+O ?= 2
 include ../common/rules.mk
 
 UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
@@ -56,7 +56,7 @@ UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
 $(ASMOBJECTS): %.o: %.s $(BUILDSTAMP)
 	$(call run,$(CXX) -o $@ -c,ASSEMBLE,$<)
 
-$(PROGRAMS): %: %.o hexdump.o
+$(call variants,$(PROGRAMS)): %: %.o hexdump.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -static -o $@ $^
 	@if grep -l '^//@disassemble' src/$@.cc >/dev/null 2>&1; then objdump --disassemble=`grep '^//@disassemble' src/$@.cc | cut -d ' ' -f 2` $@ > $@.s; fi
 
