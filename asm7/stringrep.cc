@@ -24,19 +24,24 @@ void modify(std::string& s) {
 }
 
 [[gnu::noinline]]
-void iterate(std::string& s) {
-    // print representations of foreach-based and iterator-based iteration
-    printf("\niterate:\n");
-
-    // First, iterate over the characters of the string.
+void iterate1(std::string& s) {
+    // Iterate over the characters of the string.
     for (auto ch : s) {
         hexdump_object(ch);
     }
-    // Second, iterate over references to the characters of the string.
+}
+
+[[gnu::noinline]]
+void iterate2(std::string& s) {
+    // Iterate over references to the characters of the string.
     for (auto& ch : s) {
         hexdump_object(ch);
     }
-    // Third, use explicit iterators to traverse over the string.
+}
+
+[[gnu::noinline]]
+void iterate3(std::string& s) {
+    // Use explicit iterators to traverse over the string.
     for (auto it = s.begin(); it != s.end(); ++it) {
         hexdump_object(it);
     }
@@ -46,5 +51,10 @@ void iterate(std::string& s) {
 int main() {
     std::string s;
     modify(s);
-    iterate(s);
+
+    // print representations of foreach-based and iterator-based iteration
+    printf("\niterate:\n");
+    iterate1(s);
+    iterate2(s);
+    iterate3(s);
 }

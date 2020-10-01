@@ -5,5 +5,11 @@ stringrep
 stringrep.s
 vectorrep
 vectorrep.s
+maprep
+maprep.s
+unordered_maprep
+unordered_maprep.s
+pairrep
+pairrep.s
 *.asm
 *-unsafe

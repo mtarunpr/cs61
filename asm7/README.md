@@ -23,7 +23,6 @@ example questions:
 
 * Which parts of `std::string`’s representation seem to have similar meaning
   in all three hexdumps from `modify`?
-* What differentiates the addresses and values in the three hexdump loops in
-  `iterate`?
+* What differentiates the addresses and values in the `iterate*` loops?
 
 4\. If you have extra time, repeat this exercise for `./vectorrep | less`.

@@ -22,15 +22,21 @@ void modify(std::vector<char>& v) {
 }
 
 [[gnu::noinline]]
-void iterate(std::vector<char>& v) {
-    // print representations of foreach-based and iterator-based iteration
-    printf("\niterate:\n");
+void iterate1(std::vector<char>& v) {
     for (auto ch : v) {
         hexdump_object(ch);
     }
+}
+
+[[gnu::noinline]]
+void iterate2(std::vector<char>& v) {
     for (auto& ch : v) {
         hexdump_object(ch);
     }
+}
+
+[[gnu::noinline]]
+void iterate3(std::vector<char>& v) {
     for (auto it = v.begin(); it != v.end(); ++it) {
         hexdump_object(it);
     }
@@ -40,5 +46,9 @@ void iterate(std::vector<char>& v) {
 int main() {
     std::vector<char> v;
     modify(v);
-    iterate(v);
+
+    printf("\niterate:\n");
+    iterate1(v);
+    iterate2(v);
+    iterate3(v);
 }
