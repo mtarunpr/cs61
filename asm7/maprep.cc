@@ -34,8 +34,10 @@ void iterate2(std::map<int, int>& m) {
 
 [[gnu::noinline]]
 void iterate3(std::map<int, int>& m) {
-    for (auto it = m.begin(); it != m.end(); ++it) {
+    auto it = m.begin(), last = m.end();
+    while (it != last) {
         hexdump_object(it);
+        ++it;
     }
 }
 }

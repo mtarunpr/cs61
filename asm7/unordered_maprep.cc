@@ -36,8 +36,10 @@ void iterate2(std::unordered_map<int, int>& m) {
 
 [[gnu::noinline]]
 void iterate3(std::unordered_map<int, int>& m) {
-    for (auto it = m.begin(); it != m.end(); ++it) {
+    auto it = m.begin(), last = m.end();
+    while (it != last) {
         hexdump_object(it);
+        ++it;
     }
 }
 
@@ -46,10 +48,10 @@ void iterate4(std::unordered_map<int, int>& m) {
     // HERE BE DRAGONS!
     size_t nbuckets = m.bucket_count();
     for (size_t bucket = 0; bucket != nbuckets; ++bucket) {
-        auto first = m.begin(bucket), last = m.end(bucket);
-        while (first != last) {
-            hexdump_object(*first);
-            ++first;
+        auto it = m.begin(bucket), last = m.end(bucket);
+        while (it != last) {
+            hexdump_object(*it);
+            ++it;
         }
     }
 }

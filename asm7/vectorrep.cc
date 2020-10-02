@@ -37,8 +37,10 @@ void iterate2(std::vector<char>& v) {
 
 [[gnu::noinline]]
 void iterate3(std::vector<char>& v) {
-    for (auto it = v.begin(); it != v.end(); ++it) {
+    auto it = v.begin(), last = v.end();
+    while (it != last) {
         hexdump_object(it);
+        ++it;
     }
 }
 }

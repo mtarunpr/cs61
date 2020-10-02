@@ -1,11 +1,13 @@
 BUILDABLEASM := $(sort $(patsubst %.cc,%.s,$(wildcard f*.cc)) \
-	$(patsubst src/%.cc,%.s,$(wildcard src/f*.cc)))
+	$(patsubst src/%.cc,%.s,$(wildcard src/f*.cc))) \
+	inline.s
 ALLASM := $(sort $(BUILDABLEASM) $(wildcard f*.s))
 ASMOBJECTS := $(patsubst %.s,%.o,$(ALLASM))
 ASMPROGRAMS := $(sort $(patsubst %.s,%,$(patsubst %.cc,%,$(patsubst src/%,%,$(shell grep -l main $(wildcard f*.s f*.cc src/f*.cc /dev/null))))))
 DEFAULT_ASM_CXXFLAGS = $(O)
 DEFAULT_ASM_CXXFLAGS_DEBUG = -g $(DEFAULT_ASM_CXXFLAGS)
-PROGRAMS = pairrep stringrep vectorrep maprep unordered_maprep $(ASMPROGRAMS)
+REPPROGRAMS = pairrep stringrep vectorrep maprep unordered_maprep
+PROGRAMS = $(REPPROGRAMS) $(ASMPROGRAMS)
 
 all: $(BUILDABLEASM) $(PROGRAMS)
 
@@ -25,7 +27,7 @@ UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) $(DEPCFLAGS) -o $@ -c $<
 
 %-unsafe.o: %.cc $(BUILDSTAMP)
-	$(CXX) $(CPPFLAGS) $(UNSAFEFLAGS) $(CXXFLAGS) -O1 $(DEPCFLAGS) -o $@ -c $<
+	$(CXX) $(CPPFLAGS) $(UNSAFEFLAGS) $(CXXFLAGS) $(O) $(DEPCFLAGS) -o $@ -c $<
 
 %-O0.o: %.cc $(BUILDSTAMP)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -O0 $(DEPCFLAGS) -o $@ -c $<
@@ -56,7 +58,10 @@ UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
 $(ASMOBJECTS): %.o: %.s $(BUILDSTAMP)
 	$(call run,$(CXX) -o $@ -c,ASSEMBLE,$<)
 
-$(call variants,$(PROGRAMS)): %: %.o hexdump.o
+$(REPPROGRAMS): %: %-unsafe.o hexdump.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -static -o $@ $^
+
+$(call variants,$(ASMPROGRAMS)): %: %.o hexdump.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -static -o $@ $^
 	@if grep -l '^//@disassemble' src/$@.cc >/dev/null 2>&1; then objdump --disassemble=`grep '^//@disassemble' src/$@.cc | cut -d ' ' -f 2` $@ > $@.s; fi
 

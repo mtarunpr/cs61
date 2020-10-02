@@ -42,8 +42,10 @@ void iterate2(std::string& s) {
 [[gnu::noinline]]
 void iterate3(std::string& s) {
     // Use explicit iterators to traverse over the string.
-    for (auto it = s.begin(); it != s.end(); ++it) {
+    auto it = s.begin(), last = s.end();
+    while (it != last) {
         hexdump_object(it);
+        ++it;
     }
 }
 }
