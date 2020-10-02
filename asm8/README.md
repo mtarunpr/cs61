@@ -18,7 +18,8 @@ outside world in two ways: by printing messages, and through the
 ID*) for the currently running program instance.
 
 2\. Run this program in gdb using `layout asm`. Step through `main`
-one instruction at a time. You may step over the `snprintf` calls, but
-step *into* `write` and `getpid`. Can you find the instruction that
+one instruction at a time. You may step over the `snprintf` and
+`random` calls (using the `ni` command, for example), but step *into*
+`write` and `getpid` (using `si`). Can you find the instruction that
 interacts with the outside world? What can you determine about its
 calling convention?
