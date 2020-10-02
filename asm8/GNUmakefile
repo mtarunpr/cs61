@@ -5,7 +5,7 @@ ASMOBJECTS := $(patsubst %.s,%.o,$(ALLASM))
 ASMPROGRAMS := $(sort $(patsubst %.s,%,$(patsubst %.cc,%,$(patsubst src/%,%,$(shell grep -l main $(wildcard f*.s f*.cc src/f*.cc /dev/null))))))
 DEFAULT_ASM_CXXFLAGS = $(O)
 DEFAULT_ASM_CXXFLAGS_DEBUG = -g $(DEFAULT_ASM_CXXFLAGS)
-PROGRAMS = syscalls $(ASMPROGRAMS)
+PROGRAMS = syscalls breakpoints $(ASMPROGRAMS)
 
 all: $(BUILDABLEASM) $(PROGRAMS)
 
