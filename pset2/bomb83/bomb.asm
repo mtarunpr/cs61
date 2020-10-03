@@ -662,58 +662,58 @@ Disassembly of section .text:
   401410:	55                   	push   %rbp
   401411:	48 89 e5             	mov    %rsp,%rbp
   401414:	48 83 ec 50          	sub    $0x50,%rsp
-  401418:	48 8d 75 b0          	lea    -0x50(%rbp),%rsi
-  40141c:	e8 4f 05 00 00       	callq  401970 <_Z16read_six_numbersPKcPi>
-  401421:	8b 55 b0             	mov    -0x50(%rbp),%edx
-  401424:	b9 02 00 00 00       	mov    $0x2,%ecx
+  401418:	48 8d 75 b0          	lea    -0x50(%rbp),%rsi                    # Reserve 80 bytes in stack
+  40141c:	e8 4f 05 00 00       	callq  401970 <_Z16read_six_numbersPKcPi>  # Read 6 ints
+  401421:	8b 55 b0             	mov    -0x50(%rbp),%edx                    # rdx stores first int
+  401424:	b9 02 00 00 00       	mov    $0x2,%ecx                           # Store 2 in ecx
   401429:	0f 1f 80 00 00 00 00 	nopl   0x0(%rax)
-  401430:	8d 42 ff             	lea    -0x1(%rdx),%eax
-  401433:	83 f8 05             	cmp    $0x5,%eax
+  401430:	8d 42 ff             	lea    -0x1(%rdx),%eax                     # rax = rdx - 1 (loop update)
+  401433:	83 f8 05             	cmp    $0x5,%eax                           # If rax > 5, explode (ensures all inputs are <= 6)
   401436:	0f 87 fe 00 00 00    	ja     40153a <_Z7phase_6Pc+0x12a>
-  40143c:	48 83 f9 07          	cmp    $0x7,%rcx
+  40143c:	48 83 f9 07          	cmp    $0x7,%rcx                           # If rcx = 7, break out of duplicate check loop
   401440:	74 31                	je     401473 <_Z7phase_6Pc+0x63>
-  401442:	8b 74 8d ac          	mov    -0x54(%rbp,%rcx,4),%esi
-  401446:	39 d6                	cmp    %edx,%esi
+  401442:	8b 74 8d ac          	mov    -0x54(%rbp,%rcx,4),%esi             # esi stores next int
+  401446:	39 d6                	cmp    %edx,%esi                           # if duplicates exist, explode (see loop below)
   401448:	0f 84 ec 00 00 00    	je     40153a <_Z7phase_6Pc+0x12a>
-  40144e:	48 89 c8             	mov    %rcx,%rax
-  401451:	eb 13                	jmp    401466 <_Z7phase_6Pc+0x56>
+  40144e:	48 89 c8             	mov    %rcx,%rax                           # Initialize counter for inner loop (rax = rcx)
+  401451:	eb 13                	jmp    401466 <_Z7phase_6Pc+0x56>          # Jump to loop
   401453:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)
-  401458:	48 83 c0 01          	add    $0x1,%rax
-  40145c:	39 54 85 ac          	cmp    %edx,-0x54(%rbp,%rax,4)
-  401460:	0f 84 d4 00 00 00    	je     40153a <_Z7phase_6Pc+0x12a>
-  401466:	83 f8 06             	cmp    $0x6,%eax
-  401469:	75 ed                	jne    401458 <_Z7phase_6Pc+0x48>
-  40146b:	48 83 c1 01          	add    $0x1,%rcx
+  401458:	48 83 c0 01          	add    $0x1,%rax                           ###### BEGIN LOOP
+  40145c:	39 54 85 ac          	cmp    %edx,-0x54(%rbp,%rax,4)             ## 
+  401460:	0f 84 d4 00 00 00    	je     40153a <_Z7phase_6Pc+0x12a>         ## Check until 6 for duplicate rcx
+  401466:	83 f8 06             	cmp    $0x6,%eax                           ## 
+  401469:	75 ed                	jne    401458 <_Z7phase_6Pc+0x48>          ###### END LOOP
+  40146b:	48 83 c1 01          	add    $0x1,%rcx                           # Increment rcx
   40146f:	89 f2                	mov    %esi,%edx
-  401471:	eb bd                	jmp    401430 <_Z7phase_6Pc+0x20>
-  401473:	48 8d 45 b0          	lea    -0x50(%rbp),%rax
-  401477:	b9 07 00 00 00       	mov    $0x7,%ecx
-  40147c:	48 8d 70 18          	lea    0x18(%rax),%rsi
-  401480:	89 ca                	mov    %ecx,%edx
-  401482:	2b 10                	sub    (%rax),%edx
-  401484:	48 83 c0 04          	add    $0x4,%rax
-  401488:	89 50 fc             	mov    %edx,-0x4(%rax)
-  40148b:	48 39 f0             	cmp    %rsi,%rax
-  40148e:	75 f0                	jne    401480 <_Z7phase_6Pc+0x70>
-  401490:	31 f6                	xor    %esi,%esi
+  401471:	eb bd                	jmp    401430 <_Z7phase_6Pc+0x20>          # Loop back for new rcx
+  401473:	48 8d 45 b0          	lea    -0x50(%rbp),%rax                    # rax stores first int's address
+  401477:	b9 07 00 00 00       	mov    $0x7,%ecx                           # rcx = 7
+  40147c:	48 8d 70 18          	lea    0x18(%rax),%rsi                     # rsi stores address just after 6th int
+  401480:	89 ca                	mov    %ecx,%edx                           ###### BEGIN LOOP; rdx = 7
+  401482:	2b 10                	sub    (%rax),%edx                         ## rdx = 7 - int at rax (so 1<-->6, 2<-->5, etc.)
+  401484:	48 83 c0 04          	add    $0x4,%rax                           ## rax points to next int
+  401488:	89 50 fc             	mov    %edx,-0x4(%rax)                     ## Every int is replaced by 7 - int
+  40148b:	48 39 f0             	cmp    %rsi,%rax                           ## If all 6 ints have been replaced, break
+  40148e:	75 f0                	jne    401480 <_Z7phase_6Pc+0x70>          ###### END LOOP
+  401490:	31 f6                	xor    %esi,%esi                           # Reset rsi to 0
   401492:	66 0f 1f 44 00 00    	nopw   0x0(%rax,%rax,1)
-  401498:	8b 4c b5 b0          	mov    -0x50(%rbp,%rsi,4),%ecx
-  40149c:	83 f9 01             	cmp    $0x1,%ecx
-  40149f:	7e 7f                	jle    401520 <_Z7phase_6Pc+0x110>
-  4014a1:	b8 01 00 00 00       	mov    $0x1,%eax
-  4014a6:	ba 20 36 60 00       	mov    $0x603620,%edx
-  4014ab:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)
-  4014b0:	83 c0 01             	add    $0x1,%eax
-  4014b3:	48 8b 52 08          	mov    0x8(%rdx),%rdx
-  4014b7:	39 c8                	cmp    %ecx,%eax
-  4014b9:	75 f5                	jne    4014b0 <_Z7phase_6Pc+0xa0>
-  4014bb:	48 89 54 f5 d0       	mov    %rdx,-0x30(%rbp,%rsi,8)
-  4014c0:	48 83 c6 01          	add    $0x1,%rsi
-  4014c4:	48 83 fe 06          	cmp    $0x6,%rsi
-  4014c8:	75 ce                	jne    401498 <_Z7phase_6Pc+0x88>
-  4014ca:	48 8b 55 d8          	mov    -0x28(%rbp),%rdx
-  4014ce:	48 8b 4d e0          	mov    -0x20(%rbp),%rcx
-  4014d2:	48 8b 45 d0          	mov    -0x30(%rbp),%rax
+  401498:	8b 4c b5 b0          	mov    -0x50(%rbp,%rsi,4),%ecx             ###### BEGIN LOOP; rcx = rsi'th int after 7-minusing
+  40149c:	83 f9 01             	cmp    $0x1,%ecx                           ## If rcx <= 1, break & jump to 0x401520 
+  40149f:	7e 7f                	jle    401520 <_Z7phase_6Pc+0x110>         ##
+  4014a1:	b8 01 00 00 00       	mov    $0x1,%eax                           ## rax = 1
+  4014a6:	ba 20 36 60 00       	mov    $0x603620,%edx                      ## rdx = 0x603620
+  4014ab:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)                    ##
+  4014b0:	83 c0 01             	add    $0x1,%eax                           ########## BEGIN LOOP; rax++
+  4014b3:	48 8b 52 08          	mov    0x8(%rdx),%rdx                      #### rdx  = value at (8 + rdx) (which is 16 + prev rdx)
+  4014b7:	39 c8                	cmp    %ecx,%eax                           #### If rax = rcx, break
+  4014b9:	75 f5                	jne    4014b0 <_Z7phase_6Pc+0xa0>          ########## END LOOP
+  4014bb:	48 89 54 f5 d0       	mov    %rdx,-0x30(%rbp,%rsi,8)             ## Store rdx as computed in above inner loop in address (rbp - 48) + 8*rsi
+  4014c0:	48 83 c6 01          	add    $0x1,%rsi                           ## rsi++
+  4014c4:	48 83 fe 06          	cmp    $0x6,%rsi                           ## If rsi = 6, break
+  4014c8:	75 ce                	jne    401498 <_Z7phase_6Pc+0x88>          ###### END LOOP
+  4014ca:	48 8b 55 d8          	mov    -0x28(%rbp),%rdx                    # Store 2nd 60.. address in rax
+  4014ce:	48 8b 4d e0          	mov    -0x20(%rbp),%rcx                    # Store 3rd 60.. address in rax
+  4014d2:	48 8b 45 d0          	mov    -0x30(%rbp),%rax                    # Store 1st 60.. address in rax
   4014d6:	48 89 50 08          	mov    %rdx,0x8(%rax)
   4014da:	48 89 4a 08          	mov    %rcx,0x8(%rdx)
   4014de:	48 8b 55 e8          	mov    -0x18(%rbp),%rdx
@@ -725,25 +725,25 @@ Disassembly of section .text:
   4014f4:	48 89 51 08          	mov    %rdx,0x8(%rcx)
   4014f8:	48 c7 42 08 00 00 00 	movq   $0x0,0x8(%rdx)
   4014ff:	00 
-  401500:	ba 05 00 00 00       	mov    $0x5,%edx
-  401505:	48 8b 40 08          	mov    0x8(%rax),%rax
-  401509:	8b 08                	mov    (%rax),%ecx
-  40150b:	39 f1                	cmp    %esi,%ecx
-  40150d:	7f 2b                	jg     40153a <_Z7phase_6Pc+0x12a>
-  40150f:	83 ea 01             	sub    $0x1,%edx
-  401512:	89 ce                	mov    %ecx,%esi
-  401514:	75 ef                	jne    401505 <_Z7phase_6Pc+0xf5>
+  401500:	ba 05 00 00 00       	mov    $0x5,%edx                            # rdx = 5
+  401505:	48 8b 40 08          	mov    0x8(%rax),%rax                       ###### BEGIN LOOP; rax  = value at (8 + rax) (which is 16 + prev rax?)
+  401509:	8b 08                	mov    (%rax),%ecx                          ## rcx = value at rax
+  40150b:	39 f1                	cmp    %esi,%ecx                            ## If rcx > rsi, explode
+  40150d:	7f 2b                	jg     40153a <_Z7phase_6Pc+0x12a>          ##
+  40150f:	83 ea 01             	sub    $0x1,%edx                            ## rdx--
+  401512:	89 ce                	mov    %ecx,%esi                            ## rsi = rcx
+  401514:	75 ef                	jne    401505 <_Z7phase_6Pc+0xf5>           ####### END LOOP; If rdx = 0, break and return (YAY!); else loop
   401516:	c9                   	leaveq 
   401517:	c3                   	retq   
   401518:	0f 1f 84 00 00 00 00 	nopl   0x0(%rax,%rax,1)
   40151f:	00 
-  401520:	ba 20 36 60 00       	mov    $0x603620,%edx
-  401525:	48 89 54 f5 d0       	mov    %rdx,-0x30(%rbp,%rsi,8)
-  40152a:	48 83 c6 01          	add    $0x1,%rsi
-  40152e:	48 83 fe 06          	cmp    $0x6,%rsi
+  401520:	ba 20 36 60 00       	mov    $0x603620,%edx                       # rdx = 0x603620
+  401525:	48 89 54 f5 d0       	mov    %rdx,-0x30(%rbp,%rsi,8)              # Store rdx in address (rbp - 48) + 8*rsi
+  40152a:	48 83 c6 01          	add    $0x1,%rsi                            # rsi++
+  40152e:	48 83 fe 06          	cmp    $0x6,%rsi                            # If rsi = 6, go to the mov block, else loop
   401532:	0f 85 60 ff ff ff    	jne    401498 <_Z7phase_6Pc+0x88>
   401538:	eb 90                	jmp    4014ca <_Z7phase_6Pc+0xba>
-  40153a:	e8 f1 03 00 00       	callq  401930 <_Z12explode_bombv>
+  40153a:	e8 f1 03 00 00       	callq  401930 <_Z12explode_bombv>           # EXPLODE
   40153f:	90                   	nop
 
 0000000000401540 <_Z4fun7P14treeNodeStructi>:
