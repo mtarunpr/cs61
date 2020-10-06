@@ -73,6 +73,7 @@ extern pageinfo pages[NPAGES];
 // Hardware interrupt numbers
 #define INT_IRQ                 32U
 #define IRQ_TIMER               0
+#define IRQ_KEYBOARD            1
 #define IRQ_ERROR               19
 #define IRQ_SPURIOUS            31
 
@@ -268,6 +269,13 @@ inline uint64_t kptr2pa(uint64_t kptr) {
 }
 template <typename T> inline uint64_t kptr2pa(T* kptr) {
     return reinterpret_cast<uint64_t>(kptr);
+}
+inline uint64_t pa2ka(uint64_t pa) {
+    return pa;
+}
+template <typename T = void*> inline T pa2kptr(uint64_t pa) {
+    static_assert(std::is_pointer<T>::value, "T must be pointer");
+    return reinterpret_cast<T>(pa);
 }
 
 #endif

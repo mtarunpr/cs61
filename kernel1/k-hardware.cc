@@ -671,15 +671,13 @@ bool lookup_symbol(uintptr_t addr, const char** name, uintptr_t* start) {
 
 namespace {
 struct backtracer {
-    uintptr_t rbp_;
-    uintptr_t rsp_;
-    uintptr_t stack_top_;
-
     backtracer(uintptr_t rbp, uintptr_t rsp, uintptr_t stack_top)
         : rbp_(rbp), rsp_(rsp), stack_top_(stack_top) {
+        pt_ = pa2kptr<x86_64_pagetable*>(rdcr3());
+        check();
     }
     bool ok() const {
-        return rbp_ >= rsp_ && stack_top_ - rbp_ >= 16;
+        return rsp_ != 0;
     }
     uintptr_t ret_rip() const {
         uintptr_t* rbpx = reinterpret_cast<uintptr_t*>(rbp_);
@@ -689,6 +687,21 @@ struct backtracer {
         uintptr_t* rbpx = reinterpret_cast<uintptr_t*>(rbp_);
         rsp_ = rbp_ + 16;
         rbp_ = rbpx[0];
+        check();
+    }
+
+private:
+    uintptr_t rbp_;
+    uintptr_t rsp_;
+    uintptr_t stack_top_;
+    x86_64_pagetable* pt_;
+
+    void check() {
+        if (rbp_ < rsp_
+            || stack_top_ - rbp_ < 16
+            || ((vmiter(pt_, rbp_).range_perm(16)) & PTE_P) == 0) {
+            rbp_ = rsp_ = 0;
+        }
     }
 };
 }
