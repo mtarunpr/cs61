@@ -77,7 +77,7 @@ $(OBJDIR)/%.uo: %.cc $(BUILDSTAMPS)
 
 # How to make supporting source files
 
-$(OBJDIR)/k-asm.h: kernel.hh x86-64.h build/mkkernelasm.awk $(KERNELBUILDSTAMPS)
+$(OBJDIR)/k-asm.h: kernel.hh lib.hh types.h x86-64.h build/mkkernelasm.awk $(KERNELBUILDSTAMPS)
 	$(call cxxcompile,-dM -E kernel.hh | awk -f build/mkkernelasm.awk | sort > $@,CREATE $@)
 	@if test ! -s $@; then echo '* Error creating $@!' 1>&2; exit 1; fi
 
