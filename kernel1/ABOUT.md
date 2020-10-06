@@ -59,7 +59,8 @@ If you experience runtime errors involving `obj/libqemu-nograb.so.1`, put
 prevents QEMU from grabbing the mouse.
 
 If you’re having trouble killing a QEMU, forcibly close it by running
-`make kill`.
+`make kill`. If your QEMU is running in the console, hit `Control-a x`
+to kill it.
 
 Run `make run-gdb` to start up the OS with support for GDB debugging.
 This will start the OS, but not GDB. You must run `gdb -x
