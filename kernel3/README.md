@@ -45,14 +45,13 @@ exits indicated by your bits in sequence:
 ```
 
 For instance, if you start in room \#1 with bitstring `00`, you will end up in
-room \#8. (The `0` exit from \#1 is West, which leads to \#3. The `0` exit
-from \#3 is South, which leads to \#8.) The blobby explosions hanging off
-\#3 and \#9 are death pits.
+room \#8. (The `0` exit from \#1 leads to \#3. The `0` exit from \#3 leads to
+\#8.) The blobby explosions hanging off \#3 and \#9 are death pits.
 
-1. Give a starting room from which you can reach *all* blue and red squares
+1. Give a starting room from which you can reach *all* blue and red rooms
    (\#6–9) in exactly two steps.
 
-2. Give a starting room from which you can reach *only* blue squares (\#6
+2. Give a starting room from which you can reach *only* blue rooms (\#6
    and \#8) and death pits in exactly two steps.
 
 3. Give the most boring starting room, which is the room from which you can
@@ -61,4 +60,5 @@ from \#3 is South, which leads to \#8.) The blobby explosions hanging off
 (Weak analogies: A room is like a memory page. The number of steps is like
 page table depth. A bit is like a page table index. The starting room is like
 the top-level page table address, or `%cr3`. The exit labels written in each
-room are like page table entries. A death pit is like a page fault.)
+room are like page table entries or memory contents. A death pit is like a
+page fault.)
