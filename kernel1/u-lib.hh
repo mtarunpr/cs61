@@ -75,41 +75,12 @@ __always_inline void access_memory(const void* ptr) {
 }
 
 
-// sys_getpid
-//    Return current process ID.
-inline pid_t sys_getpid() {
-    return make_syscall(SYSCALL_GETPID);
-}
-
-// sys_yield
-//    Yield control of the CPU to the kernel. The kernel will pick another
-//    process to run, if possible.
-inline void sys_yield() {
-    make_syscall(SYSCALL_YIELD);
-}
-
-// sys_page_alloc(addr)
-//    Allocate a page of memory at address `addr`. `Addr` must be page-aligned
-//    (i.e., a multiple of PAGESIZE == 4096). Returns 0 on success and -1
-//    on failure.
-inline int sys_page_alloc(void* addr) {
-    return make_syscall(SYSCALL_PAGE_ALLOC, (uintptr_t) addr);
-}
-
-// sys_getsysname()
-//    Write the name of the current OS into `buf`.
-inline int sys_getsysname(char* buf) {
-    return make_syscall(SYSCALL_GETSYSNAME, (uintptr_t) buf);
-}
-
-// sys_panic(msg)
-//    Panic.
-[[noreturn]] inline void sys_panic(const char* msg) {
-    make_syscall(SYSCALL_PANIC, (uintptr_t) msg);
-
-    // should never get here
-    while (true) {
-    }
-}
+// System call declarations
+// Definitions and explanations of system calls are in `u-lib.cc`.
+pid_t sys_getpid();
+void sys_yield();
+int sys_page_alloc(void* addr);
+int sys_getsysname(char* buf);
+[[noreturn]] void sys_panic(const char* msg);
 
 #endif
