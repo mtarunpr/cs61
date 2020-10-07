@@ -183,9 +183,16 @@ void exception(regstate* regs) {
         const char* problem = regs->reg_errcode & PFERR_PRESENT
                 ? "protection" : "missing";
 
-        console_printf(COLOR_ERROR,
-              "%s %d page fault on %p (%s %s, rip=%p)!\n",
-              entity, current->pid, addr, operation, problem, regs->reg_rip);
+        error_printf("%s %d page fault at %p (%s %s, rip=%p)!\n",
+            entity, current->pid, addr, operation, problem, regs->reg_rip);
+        goto unhandled;
+    }
+
+    case INT_GP: {
+        const char* entity = regs->reg_cs & 3 ? "Process" : "Kernel";
+
+        error_printf("%s general protection fault (rip=%p)!\n",
+            entity, regs->reg_rip);
         goto unhandled;
     }
 
