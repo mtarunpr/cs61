@@ -46,7 +46,7 @@ exits indicated by your bits in sequence:
 
 For instance, if you start in room \#1 with bitstring `00`, you will end up in
 room \#8. (The `0` exit from \#1 leads to \#3. The `0` exit from \#3 leads to
-\#8.) The blobby explosions hanging off \#3 and \#9 are death pits.
+\#8.) There are death pits hanging off \#3 and \#9.
 
 1. Give a starting room from which you can reach *all* blue and red rooms
    (\#6–9) in exactly two steps.
