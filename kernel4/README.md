@@ -62,7 +62,7 @@ P4\. Warped virtual memory
 
 Run `make run-bigdata`. Boo! Examine `p-bigdata.cc`. Now add *one line* of
 virtual memory manipulation code to `process_startup` so that `run-bigdata`
-prints `CS 61 is amazing`. (Don’t modify process memory directly; just modify
+prints `CS 61 Is Amazing`. (Don’t modify process memory directly; just modify
 memory mappings.)
 
 Make sure you remove your VM manipulation code before moving on to another
