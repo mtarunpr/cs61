@@ -3,6 +3,9 @@ CS61 2020: Kernel 4
 
 Today’s lecture is in section style: You’ll work through a set of problems.
 
+Solutions are available in the `solution.md` file, but please try working
+through the exercises yourself before peeking.
+
 Advance work
 ------------
 
