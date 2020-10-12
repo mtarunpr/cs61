@@ -50,7 +50,7 @@ void vmiter::real_find(uintptr_t va) {
             pep_ = const_cast<x86_64_pageentry_t*>(&zero_pe);
         }
     } else {
-        int curidx = (reinterpret_cast<uintptr_t>(pep_) & PAGEOFFMASK) >> 3;
+        int curidx = (reinterpret_cast<uintptr_t>(pep_) % PAGESIZE) >> 3;
         pep_ += pageindex(va, level_) - curidx;
     }
     va_ = va;
@@ -69,13 +69,17 @@ int vmiter::try_map(uintptr_t pa, int perm) {
     if (pa == (uintptr_t) -1 && perm == 0) {
         pa = 0;
     }
-    assert(!(va_ & PAGEOFFMASK));
+    // virtual address is page-aligned
+    assert((va_ % PAGESIZE) == 0);
     if (perm & PTE_P) {
+        // if mapping present, physical address is page-aligned
         assert(pa != (uintptr_t) -1);
         assert((pa & PTE_PAMASK) == pa);
     } else {
-        assert(!(pa & PTE_P));
+        assert((pa & PTE_P) == 0);
     }
+    // new permissions (`perm`) cannot be less restrictive than permissions
+    // imposed by higher-level page tables (`perm_`)
     assert(!(perm & ~perm_ & (PTE_P | PTE_W | PTE_U)));
 
     while (level_ > 0 && perm) {

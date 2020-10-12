@@ -27,7 +27,8 @@ class vmiter {
     template <typename T = void*>
     inline T kptr() const;
 
-    // Return permissions of current mapping
+    // Return permissions of current mapping.
+    // Returns 0 unless `PTE_P` is set.
     inline uint64_t perm() const;
     // Return true iff `va()` is present (`PTE_P`)
     inline bool present() const;
@@ -45,7 +46,7 @@ class vmiter {
     // Advance to virtual address `va() - delta`; return `*this`
     inline vmiter& operator-=(intptr_t delta);
     // Move to next larger page-aligned virtual address, skipping large
-    // unmapped regions
+    // non-present regions
     void next();
     // Move to `last_va()`
     void next_range();
