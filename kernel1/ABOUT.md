@@ -84,7 +84,7 @@ OS has become unresponsive).
 
 Run `make run-gdb` to start up the OS with support for GDB debugging.
 This will start the OS, but not GDB. You must run `gdb -x
-build/demoos.gdb` to connect to the running emulator; when GDB
+build/weensyos.gdb` to connect to the running emulator; when GDB
 connects, it will stop the OS and wait for instructions.
 
 If you experience runtime errors involving `obj/libqemu-nograb.so.1`, put

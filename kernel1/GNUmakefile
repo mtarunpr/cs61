@@ -163,7 +163,7 @@ run-gdb: run-gdb-$(QEMUDISPLAY)
 	@:
 run-gdb-graphic: $(QEMUIMAGEFILES) check-qemu
 	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUOPT) -gdb tcp::12949 $(QEMUIMG) &,QEMU $<)
-	$(call run,sleep 0.5; gdb -x build/demoos.gdb,GDB)
+	$(call run,sleep 0.5; gdb -x build/weensyos.gdb,GDB)
 run-gdb-console: $(QEMUIMAGEFILES) check-qemu-console
 	$(call run,$(QEMU) $(QEMUOPT) -curses -gdb tcp::12949 $(QEMUIMG),QEMU $<)
 
