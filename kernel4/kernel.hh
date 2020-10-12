@@ -49,7 +49,7 @@ extern proc ptable[NPROC];
 #define NPAGES                  (MEMSIZE_PHYSICAL / PAGESIZE)
 
 // Virtual memory size
-#define MEMSIZE_VIRTUAL         0x200000
+#define MEMSIZE_VIRTUAL         0x300000
 
 struct pageinfo {
     uint8_t refcount;
