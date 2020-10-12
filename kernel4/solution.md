@@ -1,13 +1,55 @@
-# P1. Examining memory
+# Solutions
 
-### Syscall entry
+## P1. Examining memory
 
-The `syscall_entry` function is defined in `k-exception.S` as an assembly
-function, so we cannot access it directly from inside `kernel.cc` since the C
-compiler will not know what the symbol refers to. To be able to access it from
-inside `kernel.cc`, we can define a `syscall_entry` function marked as
-`extern`, meaning the implementation is external and will be provided during
-linking.
+The first question is how to find the addresses corresponding to these
+symbols. Well, here’s one way: *ask GDB*, which knows the addresses for things.
+
+```sh
+cs61-user@9d076324193b:~/cs61-lectures/kernel4$ make run
+* Run `gdb -x build/weensyos.gdb` to connect gdb to qemu.
+...
+kohler@elsewhere$ gdb -x build/demoos.gdb
+GNU gdb (GDB) 9.2
+Copyright (C) 2020 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+...blah blah blah...
+(gdb) p syscall_entry
+$1 = {<text variable, no debug info>} 0x40ad6 <syscall_entry>
+(gdb) p process_main
+$2 = {void (void)} 0x100000 <process_main()>
+(gdb) p kernel_pagetable
+$3 = 0x4e000 <kernel_pagetable>
+(gdb) 
+```
+
+Then you can pass those address to `vmiter`.
+
+Another way is to take advantage of the symbol and assembly files created in
+the `obj/` directory. If you’re not sure what file to check, use `grep` to
+check them all:
+
+```sh
+cs61-user@9d076324193b:~/cs61-lectures/kernel4$ grep syscall_entry obj/*
+Binary file obj/kernel matches
+obj/kernel.asm:0000000000040ad6 <syscall_entry>:
+obj/kernel.asm:    wrmsr(MSR_IA32_LSTAR, reinterpret_cast<uint64_t>(syscall_entry));
+Binary file obj/kernel.full matches
+obj/kernel.sym:0000000000040ad6 T syscall_entry
+Binary file obj/k-exception.ko matches
+Binary file obj/k-hardware.ko matches
+```
+
+Or you can get addresses from the compiler—though this is not as easy as it
+might first appear.
+
+### `syscall_entry`
+
+The `syscall_entry` function is defined in `k-exception.S` as an assembly function, so
+we cannot access it directly from inside `kernel.cc` since the C compiler will not know
+what the symbol refers to. To be able to access it from inside `kernel.cc`, we can define
+a `syscall_entry` function marked as `extern`, meaning the implementation is external
+and will be provided during linking.
 
 Placing this line of code above the definition of `kernel_start` will allow us
 to access the function now!
@@ -69,7 +111,7 @@ addresses do not appear to change. This makes sense, because `process_setup`
 does not modify any of the virtual addresses, and does not perform any mappings
 that are not identity mappings.
 
-# P2. Examining permissions
+## P2. Examining permissions
 
 We can use the same `vmiter` objects as before, but print the permission bits
 instead:
@@ -89,7 +131,13 @@ because that page needs to be user-accessible so that the user process
 `process_main` is now marked with the `PTE_U` bit, and it wasn't before calling
 `process_setup`.
 
-# P3. Examining page table structures
+Some other bits also change. In particular, the permissions before
+`process_setup` equal `0x3` (`PTE_W|PTE_P`), but afterward you might see
+`0x27` or `39`. `x86-64.h` says that these bits are `PTE_U|PTE_W|PTE_P|PTE_A`.
+The `PTE_A` bit is set automatically by the processor hardware to indicate
+that the relevant address range has been **A**ccessed.
+
+## P3. Examining page table structures
 
 Let's use a `ptiter` to print the page table pages:
 
@@ -104,10 +152,16 @@ I see
 
 ```
 [0x0, 0x200000): level-1 ptp at pa 0x51000
+[0x200000, 0x400000): level-1 ptp at pa 0x52000
+[0x0, 0x40000000): level-2 ptp at pa 0x50000
+[0x0, 0x8000000000): level-3 ptp at pa 0x4f000
 ```
 
-We can modify our code slightly to print the contents of each page table page
-(there is only 1):
+> **Note.** If you ran this code on the original handout, you would have seen
+> *only one* page table page, the first. This is because the handout OS’s
+> `MEMSIZE_VIRTUAL` was originally too small.
+
+We can modify our code slightly to print the contents of each page table page.
 
 ```
 for (ptiter it(kernel_pagetable); it.va() < MEMSIZE_VIRTUAL; it.next()) {
@@ -138,15 +192,18 @@ We see a lot of numbers like
 ...
 ```
 
-Specifically, almost all end with `3`, but some end with `7`, and the fourth
-hex digit always increases by 1. Fascinating!
+Specifically, almost all end with `3`—which we know from P2 is
+`PTE_P|PTE_W`—but some end with `7`—which is `PTE_P|PTE_W|PTE_U`. The
+fourth hex digit always increases by 1. And in the later page table
+pages, we see some numbers that look like addresses of earlier page
+table pages. Fascinating!
 
-# P4. Warped virtual memory
+## P4. Warped virtual memory
 
-Without any modification, `p-bigdata` prints `CS 61 is Awful` :(. To fix this,
-we can notice that there is a page boundary at `&big_data[4096]`, which happens
-to correspond to the point 10 bytes into the string. The `|` marks the page
-boundary in the string below:
+Without any modification, `p-bigdata` prints `CS 61 Is Awful` :(. To fix this, we
+can notice that there is a page boundary at `&big_data[4096]`, which happens to
+correspond to the point 10 bytes into the string. The `|` marks the page boundary
+in the string below:
 
 ```
 CS 61 Is A|wful
@@ -172,12 +229,12 @@ Then the memory space will look like this after running the two calls to
 ```
 (va: 0x102000/pa: 0x103000): mazing
 ...
-(va: 0x102ff6/pa: 0x103ff6): CS 61 is A
+(va: 0x102ff6/pa: 0x103ff6): CS 61 Is A
 (va: 0x103000/pa: 0x103000): mazing
 ```
 
 This looks good! When we print the bytes at virtual address `0x102ff6`, we will
-see `CS 61 is Amazing`.  Remember, virtual address `0x103000` is still mapped
+see `CS 61 Is Amazing`.  Remember, virtual address `0x103000` is still mapped
 to physical address `0x103000` because we didn't modify that mapping!
 
 So if we add the following line of code to `process_setup`, we can perform the
@@ -198,7 +255,7 @@ and use that for the mapping:
 vmiter(p->pagetable, 0x102000).map(vmiter(p->pagetable, 0x103000).pa(), PTE_PWU);
 ```
 
-# P5. Examining faults
+## P5. Examining faults
 
 ### 1.
 
