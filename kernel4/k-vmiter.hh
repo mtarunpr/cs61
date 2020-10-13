@@ -94,7 +94,7 @@ class vmiter {
 class ptiter {
   public:
     // Initialize a physical iterator for `pt` with initial virtual address 0.
-    inline ptiter(x86_64_pagetable* pt);
+    ptiter(x86_64_pagetable* pt);
     inline ptiter(const proc* p);
 
     // Return true once `ptiter` has iterated over all page table pages
@@ -115,6 +115,13 @@ class ptiter {
     // Return level of current page table page (0-2)
     inline int level() const;
 
+    // Return first virtual address covered by current page table entry (0-511)
+    inline uintptr_t entry_va(unsigned idx) const;
+    // Return one past the last virtual address covered by entry
+    inline uintptr_t entry_last_va(unsigned idx) const;
+    // Return current page table entry
+    inline x86_64_pageentry_t entry(unsigned idx) const;
+
     [[deprecated]] inline bool active() const;
 
   private:
@@ -123,7 +130,6 @@ class ptiter {
     int level_;
     uintptr_t va_;
 
-    void go(uintptr_t va);
     void down(bool skip);
 };
 
@@ -200,10 +206,6 @@ inline int vmiter::try_map(void* kp, int perm) {
     return try_map((uintptr_t) kp, perm);
 }
 
-inline ptiter::ptiter(x86_64_pagetable* pt)
-    : pt_(pt) {
-    go(0);
-}
 inline ptiter::ptiter(const proc* p)
     : ptiter(p->pagetable) {
 }
@@ -230,6 +232,16 @@ inline uintptr_t ptiter::pa() const {
 }
 inline x86_64_pagetable* ptiter::kptr() const {
     return reinterpret_cast<x86_64_pagetable*>(pa());
+}
+inline uintptr_t ptiter::entry_va(unsigned idx) const {
+    return va() + idx * (pageoffmask(level_ - 1) + 1);
+}
+inline uintptr_t ptiter::entry_last_va(unsigned idx) const {
+    return va() + (idx + 1) * (pageoffmask(level_ - 1) + 1);
+}
+inline x86_64_pageentry_t ptiter::entry(unsigned idx) const {
+    assert(idx < (1U << PAGEINDEXBITS));
+    return kptr()->entry[idx];
 }
 
 #endif
