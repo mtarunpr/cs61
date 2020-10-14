@@ -15,17 +15,17 @@ __noinline int sys_yield() {
 
 // sys_page_alloc(addr)
 //    Allocate a page of memory at address `addr`. `Addr` must be page-aligned
-//    (i.e., a multiple of PAGESIZE == 4096). Returns 0 on success and -1
-//    on failure.
+//    (i.e., a multiple of PAGESIZE == 4096). Returns 0 on success or a
+//    negative error code.
 __noinline int sys_page_alloc(void* addr) {
     return make_syscall(SYSCALL_PAGE_ALLOC, (uintptr_t) addr);
 }
 
 // sys_getsysname()
-//    Write the name of the current OS into `buf`. Returns the length of the
-//    OS name.
-__noinline int sys_getsysname(char* buf) {
-    return make_syscall(SYSCALL_GETSYSNAME, (uintptr_t) buf);
+//    Write the name of the current OS into the first `sz` bytes of `buf`.
+//    Returns the length of the OS name or a negative error code.
+__noinline ssize_t sys_getsysname(char* buf, size_t sz) {
+    return make_syscall(SYSCALL_GETSYSNAME, (uintptr_t) buf, sz);
 }
 
 // sys_changereg(pid, reg, value)
@@ -67,9 +67,12 @@ int error_vprintf(int cpos, int color, const char* format, va_list val) {
     return console_vprintf(cpos, color, format, val);
 }
 
-void assert_fail(const char* file, int line, const char* msg) {
-    error_printf(CPOS(23, 0), COLOR_ERROR,
-                 "%s:%d: user assertion '%s' failed\n",
-                 file, line, msg);
+void assert_fail(const char* file, int line, const char* msg,
+                 const char* description) {
+    cursorpos = CPOS(23, 0);
+    if (description) {
+        error_printf("%s:%d: %s\n", file, line, description);
+    }
+    error_printf("%s:%d: user assertion '%s' failed\n", file, line, msg);
     sys_panic(nullptr);
 }

@@ -117,7 +117,7 @@ void process_setup(pid_t pid, const char* program_name) {
              a += PAGESIZE) {
             assert(a >= first_addr && a < last_addr);
             assert(!pages[a / PAGESIZE].used());
-            pages[a / PAGESIZE].refcount = 1;
+            ++pages[a / PAGESIZE].refcount;
             vmiter(p->pagetable, a).map(a, PTE_P | PTE_W | PTE_U);
         }
     }
@@ -134,7 +134,7 @@ void process_setup(pid_t pid, const char* program_name) {
     // allocate stack
     uintptr_t stack_addr = last_addr - PAGESIZE;
     assert(!pages[stack_addr / PAGESIZE].used());
-    pages[stack_addr / PAGESIZE].refcount = 1;
+    ++pages[stack_addr / PAGESIZE].refcount;
     vmiter(p->pagetable, stack_addr).map(stack_addr, PTE_P | PTE_W | PTE_U);
     p->regs.reg_rsp = stack_addr + PAGESIZE;
 
@@ -142,6 +142,14 @@ void process_setup(pid_t pid, const char* program_name) {
     p->state = P_RUNNABLE;
 }
 
+
+
+// kalloc(sz)
+//    The kernel allocator is disabled for this version of WeensyOS.
+
+void* kalloc(size_t sz) {
+    assert(false, "kalloc not implemented");
+}
 
 
 // exception(regs)
@@ -259,9 +267,11 @@ uintptr_t syscall(regstate* regs) {
 
     case SYSCALL_GETSYSNAME: {
         const char* osname = "DemoOS 61.61";
+        size_t oslen = strlen(osname);
         char* buf = (char*) current->regs.reg_rdi;
-        strcpy(buf, osname);
-        return 0;
+        size_t bufsz = current->regs.reg_rsi;
+        strncpy(buf, osname, bufsz);
+        return oslen;
     }
 
     case SYSCALL_CHANGEREG:

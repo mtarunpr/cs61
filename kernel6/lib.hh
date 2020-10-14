@@ -20,6 +20,7 @@ void* memchr(const void* s, int c, size_t n);
 size_t strlen(const char* s);
 size_t strnlen(const char* s, size_t maxlen);
 char* strcpy(char* dst, const char* src);
+char* strncpy(char* dst, const char* src, size_t maxlen);
 int strcmp(const char* a, const char* b);
 int strncmp(const char* a, const char* b, size_t maxlen);
 int strcasecmp(const char* a, const char* b);
@@ -217,6 +218,12 @@ inline uint32_t crc32c(const void* buf, size_t sz) {
 #define SYSCALL_GETSYSNAME      5
 #define SYSCALL_CHANGEREG       6
 
+// Error codes returned by system calls.
+
+#define E_FAULT                 -14      // Bad address
+#define E_NOEXEC                -8       // No such program image
+#define E_NOMEM                 -12      // Out of memory
+
 
 // CGA console printing
 
@@ -303,13 +310,14 @@ void error_printf(const char* format, ...)
 
 // assert(x)
 //    If `x == 0`, print a message and fail.
-#define assert(x)           do {                                        \
+#define assert(x, ...)       do {                                       \
         if (!(x)) {                                                     \
-            assert_fail(__FILE__, __LINE__, #x);                        \
+            assert_fail(__FILE__, __LINE__, #x, ## __VA_ARGS__);        \
         }                                                               \
     } while (0)
-void __attribute__((noinline, noreturn, cold))
-assert_fail(const char* file, int line, const char* msg);
+__attribute__((noinline, noreturn, cold))
+void assert_fail(const char* file, int line, const char* msg,
+                 const char* description = nullptr);
 
 
 // assert_[eq, ne, lt, le, gt, ge](x, y)

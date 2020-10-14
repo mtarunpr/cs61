@@ -91,6 +91,19 @@ char* strcpy(char* dst, const char* src) {
     return dst;
 }
 
+char* strncpy(char* dst, const char* src, size_t maxlen) {
+    char* d = dst;
+    while (maxlen > 0 && *src != '\0') {
+        *d++ = *src++;
+        --maxlen;
+    }
+    while (maxlen > 0) {
+        *d++ = '\0';
+        --maxlen;
+    }
+    return dst;
+}
+
 int strcmp(const char* a, const char* b) {
     while (true) {
         unsigned char ac = *a, bc = *b;

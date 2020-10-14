@@ -70,13 +70,13 @@ int vmiter::try_map(uintptr_t pa, int perm) {
         pa = 0;
     }
     // virtual address is page-aligned
-    assert((va_ % PAGESIZE) == 0);
+    assert((va_ % PAGESIZE) == 0, "vmiter::try_map va not aligned");
     if (perm & PTE_P) {
         // if mapping present, physical address is page-aligned
-        assert(pa != (uintptr_t) -1);
-        assert((pa & PTE_PAMASK) == pa);
+        assert(pa != (uintptr_t) -1, "vmiter::try_map mapping nonexistent pa");
+        assert((pa & PTE_PAMASK) == pa, "vmiter::try_map pa not aligned");
     } else {
-        assert((pa & PTE_P) == 0);
+        assert((pa & PTE_P) == 0, "vmiter::try_map invalid pa");
     }
     // new permissions (`perm`) cannot be less restrictive than permissions
     // imposed by higher-level page tables (`perm_`)
@@ -84,7 +84,12 @@ int vmiter::try_map(uintptr_t pa, int perm) {
 
     while (level_ > 0 && perm) {
         assert(!(*pep_ & PTE_P));
-	return -1;
+        x86_64_pagetable* pt = (x86_64_pagetable*) kalloc(PAGESIZE);
+        if (!pt) {
+            return -1;
+        }
+        memset(pt, 0, PAGESIZE);
+        *pep_ = (uintptr_t) pt | PTE_P | PTE_W | PTE_U;
     }
 
     if (level_ == 0) {

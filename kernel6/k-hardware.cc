@@ -869,8 +869,12 @@ void panic_at(uintptr_t rsp, uintptr_t rbp, uintptr_t rip,
     fail();
 }
 
-void assert_fail(const char* file, int line, const char* msg) {
+void assert_fail(const char* file, int line, const char* msg,
+                 const char* description) {
     cursorpos = CPOS(23, 0);
+    if (description) {
+        error_printf("%s:%d: %s\n", file, line, description);
+    }
     error_printf("%s:%d: kernel assertion '%s' failed\n", file, line, msg);
     error_print_backtrace(rdrsp(), rdrbp());
     fail();

@@ -197,7 +197,7 @@ inline void vmiter::next_range() {
 }
 inline void vmiter::map(uintptr_t pa, int perm) {
     int r = try_map(pa, perm);
-    assert(r == 0);
+    assert(r == 0, "vmiter::map failed");
 }
 inline void vmiter::map(void* kp, int perm) {
     map((uintptr_t) kp, perm);
