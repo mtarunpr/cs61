@@ -741,14 +741,14 @@ int error_vprintf(int cpos, int color, const char* format, va_list val) {
 
 
 // check_keyboard
-//    Check for the user typing a control key. 'h', 'b', and 'r' cause a soft
-//    reboot where the kernel runs hello, bigdata, or recurse, respectively.
-//    Control-C or 'q' exit the virtual machine. Returns key typed or -1 for
-//    no key.
+//    Check for the user typing a control key. 'a', 'e', 'r', and 'x' cause a
+//    soft reboot where the kernel runs alice, eve, recurse, or alice+eve,
+//    respectively. Control-C or 'q' exit the virtual machine. Returns key
+//    typed or -1 for no key.
 
 int check_keyboard() {
     int c = keyboard_readc();
-    if (c == 'h' || c == 'b' || c == 'r') {
+    if (c == 'a' || c == 'e' || c == 'r' || c == 'x') {
         // Turn off the timer interrupt.
         init_timer(-1);
         // Install a temporary page table to carry us through the
@@ -764,9 +764,11 @@ int check_keyboard() {
         // though it will get overwritten as the kernel runs.
         uint32_t multiboot_info[5];
         multiboot_info[0] = 4;
-        const char* argument = "hello";
-        if (c == 'b') {
-            argument = "bigdata";
+        const char* argument = "aliceandeve";
+        if (c == 'h') {
+            argument = "alice";
+        } else if (c == 'e') {
+            argument = "eve";
         } else if (c == 'r') {
             argument = "recurse";
         }
@@ -883,8 +885,8 @@ extern uint8_t _binary_obj_p_hello_start[];
 extern uint8_t _binary_obj_p_hello_end[];
 extern uint8_t _binary_obj_p_bigdata_start[];
 extern uint8_t _binary_obj_p_bigdata_end[];
-extern uint8_t _binary_obj_p_recurse_start[];
-extern uint8_t _binary_obj_p_recurse_end[];
+extern uint8_t _binary_obj_p_yielder_start[];
+extern uint8_t _binary_obj_p_yielder_end[];
 
 struct ramimage {
     const char* name;
@@ -893,7 +895,7 @@ struct ramimage {
 } ramimages[] = {
     { "hello", _binary_obj_p_hello_start, _binary_obj_p_hello_end },
     { "bigdata", _binary_obj_p_bigdata_start, _binary_obj_p_bigdata_end },
-    { "recurse", _binary_obj_p_recurse_start, _binary_obj_p_recurse_end }
+    { "yielder", _binary_obj_p_yielder_start, _binary_obj_p_yielder_end }
 };
 
 program_image::program_image(int program_number) {

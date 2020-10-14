@@ -741,10 +741,10 @@ int error_vprintf(int cpos, int color, const char* format, va_list val) {
 
 
 // check_keyboard
-//    Check for the user typing a control key. 'a', 'e', 'r', and 'x'
-//    cause a soft where the kernel runs alice, eve, recurse, or alice+eve,
-//    respectively. Control-C or 'q' exit the virtual machine.
-//    Returns key typed or -1 for no key.
+//    Check for the user typing a control key. 'a', 'e', 'r', and 'x' cause a
+//    soft reboot where the kernel runs alice, eve, recurse, or alice+eve,
+//    respectively. Control-C or 'q' exit the virtual machine. Returns key
+//    typed or -1 for no key.
 
 int check_keyboard() {
     int c = keyboard_readc();
