@@ -90,6 +90,7 @@ int vmiter::try_map(uintptr_t pa, int perm) {
         }
         memset(pt, 0, PAGESIZE);
         *pep_ = (uintptr_t) pt | PTE_P | PTE_W | PTE_U;
+        down();
     }
 
     if (level_ == 0) {
