@@ -300,7 +300,7 @@ x86_64_pagetable* kalloc_pagetable() {
 //    are mapped at the expected addresses.
 
 void check_pagetable(x86_64_pagetable* pagetable) {
-    assert(((uintptr_t) pagetable & PAGEOFFMASK) == 0); // must be page aligned
+    assert(((uintptr_t) pagetable % PAGESIZE) == 0); // must be page aligned
     assert(vmiter(pagetable, (uintptr_t) exception_entry).pa()
            == kptr2pa(exception_entry));
     assert(vmiter(kernel_pagetable, (uintptr_t) pagetable).pa()
@@ -741,14 +741,14 @@ int error_vprintf(int cpos, int color, const char* format, va_list val) {
 
 
 // check_keyboard
-//    Check for the user typing a control key. 'h' causes a
-//    soft reboot where the kernel runs hello.
-//    Control-C or 'q' exit the virtual machine. Returns key
+//    Check for the user typing a control key. 'b', 'h', and 's' cause a
+//    soft reboot where the kernel runs hello+yielder, hello, or spawn,
+//    respectively. Control-C or 'q' exit the virtual machine. Returns key
 //    typed or -1 for no key.
 
 int check_keyboard() {
     int c = keyboard_readc();
-    if (c == 'h' || c == 'x') {
+    if (c == 'b' || c == 'h' || c == 's' || c == 'x') {
         // Turn off the timer interrupt.
         init_timer(-1);
         // Install a temporary page table to carry us through the
@@ -764,7 +764,12 @@ int check_keyboard() {
         // though it will get overwritten as the kernel runs.
         uint32_t multiboot_info[5];
         multiboot_info[0] = 4;
-        const char* argument = "hello";
+        const char* argument = "both";
+        if (c == 'h') {
+            argument = "hello";
+        } else if (c == 's') {
+            argument = "spawn";
+        }
         uintptr_t argument_ptr = (uintptr_t) argument;
         assert(argument_ptr < 0x100000000L);
         multiboot_info[4] = (uint32_t) argument_ptr;
@@ -882,6 +887,8 @@ extern uint8_t _binary_obj_p_hello_start[];
 extern uint8_t _binary_obj_p_hello_end[];
 extern uint8_t _binary_obj_p_yielder_start[];
 extern uint8_t _binary_obj_p_yielder_end[];
+extern uint8_t _binary_obj_p_spawn_start[];
+extern uint8_t _binary_obj_p_spawn_end[];
 
 struct ramimage {
     const char* name;
@@ -889,7 +896,8 @@ struct ramimage {
     void* end;
 } ramimages[] = {
     { "hello", _binary_obj_p_hello_start, _binary_obj_p_hello_end },
-    { "yielder", _binary_obj_p_yielder_start, _binary_obj_p_yielder_end }
+    { "yielder", _binary_obj_p_yielder_start, _binary_obj_p_yielder_end },
+    { "spawn", _binary_obj_p_spawn_start, _binary_obj_p_spawn_end }
 };
 
 program_image::program_image(int program_number) {
