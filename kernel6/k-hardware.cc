@@ -883,8 +883,6 @@ void assert_fail(const char* file, int line, const char* msg) {
 
 extern uint8_t _binary_obj_p_hello_start[];
 extern uint8_t _binary_obj_p_hello_end[];
-extern uint8_t _binary_obj_p_bigdata_start[];
-extern uint8_t _binary_obj_p_bigdata_end[];
 extern uint8_t _binary_obj_p_yielder_start[];
 extern uint8_t _binary_obj_p_yielder_end[];
 
@@ -894,7 +892,6 @@ struct ramimage {
     void* end;
 } ramimages[] = {
     { "hello", _binary_obj_p_hello_start, _binary_obj_p_hello_end },
-    { "bigdata", _binary_obj_p_bigdata_start, _binary_obj_p_bigdata_end },
     { "yielder", _binary_obj_p_yielder_start, _binary_obj_p_yielder_end }
 };
 
