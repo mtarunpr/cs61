@@ -284,7 +284,14 @@ void exception(regstate* regs) {
 
     default:
     unhandled:
-        panic("Unexpected exception %d!\n", regs->reg_intno);
+        if ((regs->reg_cs & 3) != 0) {
+            error_printf("Process %d unexpected exception %d (rip=%p)!\n",
+                         current->pid, regs->reg_intno, regs->reg_rip);
+            current->state = P_BROKEN;
+            break;
+        } else {
+            panic("Unexpected exception %d!\n", regs->reg_intno);
+        }
 
     }
 
