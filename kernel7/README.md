@@ -37,8 +37,8 @@ into the first loop (and make the second loop redundant).
 ```c++
 // initialize_segment_page(pg, va, seg)
 //    Initialize the single page of memory at kernel address `pg`
-//    for mapping into process memory at address `va`,
-//    using segment `seg`.
+//    using `seg` to the page of initial process memory at
+//    process virtual address `va`.
 //    This will zero the page, and may copy some data from `seg.data()`
 //    into the page depending on `va`.
 //    Requires that `pg` and `va` are page-aligned.
@@ -59,6 +59,10 @@ However, implementing this function is tricky, because of the edge cases shown
 in the segment diagram (especially different page alignments). Discuss these
 edge cases and sketch an algorithm for implementing the function. Implement
 and test your algorithm if you have time.
+
+**Hint:** First consider the case where `seg.va()` is page aligned (`seg.va()
+% PAGESIZE == 0`). Then extend your logic to handle the case when `seg.va()`
+is not page aligned.
 
 P2\. Spawn
 ----------
