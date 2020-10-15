@@ -38,6 +38,11 @@ class vmiter {
     inline bool user() const;
     // Return intersection of permissions in [va(), va() + sz)
     uint64_t range_perm(size_t sz) const;
+    // Return true iff `(perm() & desired_perm) == desired_perm`.
+    inline bool perm(uint64_t desired_perm) const;
+    // Return true iff `(range_perm(sz) & desired_perm) == desired_perm`.
+    inline bool range_perm(size_t sz, uint64_t desired_perm) const;
+
 
     // Move to virtual address `va`; return `*this`
     inline vmiter& find(uintptr_t va);
@@ -173,14 +178,20 @@ inline uint64_t vmiter::perm() const {
         return 0;
     }
 }
+inline bool vmiter::perm(uint64_t desired_perm) const {
+    return (perm() & desired_perm) == desired_perm;
+}
 inline bool vmiter::present() const {
-    return (*pep_ & PTE_P) == PTE_P;
+    return perm(PTE_P);
 }
 inline bool vmiter::writable() const {
-    return (*pep_ & (PTE_P | PTE_W)) == (PTE_P | PTE_W);
+    return perm(PTE_P | PTE_W);
 }
 inline bool vmiter::user() const {
-    return (*pep_ & (PTE_P | PTE_U)) == (PTE_P | PTE_U);
+    return perm(PTE_P | PTE_U);
+}
+inline bool vmiter::range_perm(size_t sz, uint64_t desired_perm) const {
+    return (range_perm(sz) & desired_perm) == desired_perm;
 }
 inline vmiter& vmiter::find(uintptr_t va) {
     real_find(va);
