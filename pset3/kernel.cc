@@ -151,8 +151,9 @@ void process_setup(pid_t pid, const char* program_name) {
 
     // initialize process page table
     ptable[pid].pagetable = kalloc_pagetable();
-    for (vmiter it(ptable[pid].pagetable), it_kernel(kernel_pagetable);
-         it.va() < PROC_START_ADDR;
+    vmiter it(ptable[pid].pagetable);
+    for (vmiter it_kernel(kernel_pagetable);
+         it_kernel.va() < PROC_START_ADDR;
          it += PAGESIZE, it_kernel += PAGESIZE) {
         it.map(it.va(), it_kernel.perm());
     }
@@ -160,15 +161,17 @@ void process_setup(pid_t pid, const char* program_name) {
     // obtain reference to the program image
     program_image pgm(program_name);
 
+    // change pagetable to process's pagetable
+    set_pagetable(ptable[pid].pagetable);
+
     // allocate and map all memory
     for (auto seg = pgm.begin(); seg != pgm.end(); ++seg) {
         for (uintptr_t a = round_down(seg.va(), PAGESIZE);
              a < seg.va() + seg.size();
              a += PAGESIZE) {
-            vmiter it(ptable[pid].pagetable, a);
-            it.map(a, PTE_P | PTE_W | PTE_U);
-            assert(!pages[a / PAGESIZE].used());
-            pages[a / PAGESIZE].refcount = 1;
+            void* ptr = kalloc(PAGESIZE);
+            it.find(a);
+            it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
         }
     }
 
@@ -183,10 +186,9 @@ void process_setup(pid_t pid, const char* program_name) {
 
     // allocate stack
     uintptr_t stack_addr = PROC_START_ADDR + PROC_SIZE * pid - PAGESIZE;
-    vmiter it(ptable[pid].pagetable, stack_addr);
-    it.map(stack_addr, PTE_P | PTE_W | PTE_U);
-    assert(!pages[stack_addr / PAGESIZE].used());
-    pages[stack_addr / PAGESIZE].refcount = 1;
+    void* ptr = kalloc(PAGESIZE);
+    it.find(stack_addr);
+    it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
 
     // mark process as runnable
@@ -332,13 +334,10 @@ int syscall_page_alloc(uintptr_t addr) {
     if (addr % PAGESIZE != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
         return -1;
     }
-
+    void* ptr = kalloc(PAGESIZE);
     pid_t pid = (addr - PROC_START_ADDR) / PROC_SIZE + 1;
     vmiter it(ptable[pid].pagetable, addr);
-    it.map(addr, PTE_P | PTE_W | PTE_U);
-
-    assert(!pages[addr / PAGESIZE].used());
-    pages[addr / PAGESIZE].refcount = 1;
+    it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
     memset((void*) addr, 0, PAGESIZE);
     return 0;
 }
