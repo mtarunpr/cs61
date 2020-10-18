@@ -150,7 +150,12 @@ void process_setup(pid_t pid, const char* program_name) {
     init_process(&ptable[pid], 0);
 
     // initialize process page table
-    ptable[pid].pagetable = kernel_pagetable;
+    ptable[pid].pagetable = kalloc_pagetable();
+    for (vmiter it(ptable[pid].pagetable), it_kernel(kernel_pagetable);
+         it.va() < PROC_START_ADDR;
+         it += PAGESIZE, it_kernel += PAGESIZE) {
+        it.map(it.va(), it_kernel.perm());
+    }
 
     // obtain reference to the program image
     program_image pgm(program_name);
@@ -160,6 +165,8 @@ void process_setup(pid_t pid, const char* program_name) {
         for (uintptr_t a = round_down(seg.va(), PAGESIZE);
              a < seg.va() + seg.size();
              a += PAGESIZE) {
+            vmiter it(ptable[pid].pagetable, a);
+            it.map(a, PTE_P | PTE_W | PTE_U);
             assert(!pages[a / PAGESIZE].used());
             pages[a / PAGESIZE].refcount = 1;
         }
@@ -176,6 +183,8 @@ void process_setup(pid_t pid, const char* program_name) {
 
     // allocate stack
     uintptr_t stack_addr = PROC_START_ADDR + PROC_SIZE * pid - PAGESIZE;
+    vmiter it(ptable[pid].pagetable, stack_addr);
+    it.map(stack_addr, PTE_P | PTE_W | PTE_U);
     assert(!pages[stack_addr / PAGESIZE].used());
     pages[stack_addr / PAGESIZE].refcount = 1;
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
@@ -323,6 +332,11 @@ int syscall_page_alloc(uintptr_t addr) {
     if (addr % PAGESIZE != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
         return -1;
     }
+
+    pid_t pid = (addr - PROC_START_ADDR) / PROC_SIZE + 1;
+    vmiter it(ptable[pid].pagetable, addr);
+    it.map(addr, PTE_P | PTE_W | PTE_U);
+
     assert(!pages[addr / PAGESIZE].used());
     pages[addr / PAGESIZE].refcount = 1;
     memset((void*) addr, 0, PAGESIZE);
