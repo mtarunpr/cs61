@@ -69,7 +69,11 @@ void kernel_start(const char* command) {
          it.va() < MEMSIZE_PHYSICAL;
          it += PAGESIZE) {
         if (it.va() != 0) {
-            it.map(it.va(), PTE_P | PTE_W | PTE_U);
+            int flags = PTE_P | PTE_W;
+            if (it.va() >= PROC_START_ADDR || it.va() == CONSOLE_ADDR) {
+                flags |= PTE_U;
+            }
+            it.map(it.va(), flags);
         } else {
             // nullptr is inaccessible even to the kernel
             it.map(it.va(), 0);
@@ -316,6 +320,9 @@ uintptr_t syscall(regstate* regs) {
 //    in `u-lib.hh` (but in the handout code, it does not).
 
 int syscall_page_alloc(uintptr_t addr) {
+    if (addr % PAGESIZE != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
+        return -1;
+    }
     assert(!pages[addr / PAGESIZE].used());
     pages[addr / PAGESIZE].refcount = 1;
     memset((void*) addr, 0, PAGESIZE);
