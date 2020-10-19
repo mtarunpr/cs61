@@ -185,7 +185,7 @@ void process_setup(pid_t pid, const char* program_name) {
     ptable[pid].regs.reg_rip = pgm.entry();
 
     // allocate stack
-    uintptr_t stack_addr = PROC_START_ADDR + PROC_SIZE * pid - PAGESIZE;
+    uintptr_t stack_addr = MEMSIZE_VIRTUAL - PAGESIZE;
     void* ptr = kalloc(PAGESIZE);
     it.find(stack_addr);
     it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
@@ -335,10 +335,13 @@ int syscall_page_alloc(uintptr_t addr) {
         return -1;
     }
     void* ptr = kalloc(PAGESIZE);
-    pid_t pid = (addr - PROC_START_ADDR) / PROC_SIZE + 1;
-    vmiter it(ptable[pid].pagetable, addr);
+    if (!ptr) {
+        console_printf(CPOS(24, 0), 0x0400, "Out of physical memory!");
+        return -1;
+    }
+    vmiter it(current->pagetable, addr);
     it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
-    memset((void*) addr, 0, PAGESIZE);
+    memset(ptr, 0, PAGESIZE);
     return 0;
 }
 
