@@ -155,7 +155,7 @@ void process_setup(pid_t pid, const char* program_name) {
     for (vmiter it_kernel(kernel_pagetable);
          it_kernel.va() < PROC_START_ADDR;
          it += PAGESIZE, it_kernel += PAGESIZE) {
-        it.map(it.va(), it_kernel.perm());
+        it.map(it_kernel.pa(), it_kernel.perm());
     }
 
     // obtain reference to the program image
@@ -171,7 +171,7 @@ void process_setup(pid_t pid, const char* program_name) {
              a += PAGESIZE) {
             void* ptr = kalloc(PAGESIZE);
             it.find(a);
-            it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
+            it.map((uintptr_t) ptr, PTE_PWU);
         }
     }
 
@@ -188,7 +188,7 @@ void process_setup(pid_t pid, const char* program_name) {
     uintptr_t stack_addr = MEMSIZE_VIRTUAL - PAGESIZE;
     void* ptr = kalloc(PAGESIZE);
     it.find(stack_addr);
-    it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
+    it.map((uintptr_t) ptr, PTE_PWU);
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
 
     // mark process as runnable
@@ -281,6 +281,7 @@ void exception(regstate* regs) {
 //    Note that hardware interrupts are disabled when the kernel is running.
 
 int syscall_page_alloc(uintptr_t addr);
+pid_t syscall_fork();
 
 uintptr_t syscall(regstate* regs) {
     // Copy the saved registers into the `current` process descriptor.
@@ -316,6 +317,9 @@ uintptr_t syscall(regstate* regs) {
     case SYSCALL_PAGE_ALLOC:
         return syscall_page_alloc(current->regs.reg_rdi);
 
+    case SYSCALL_FORK:
+        return syscall_fork();
+
     default:
         panic("Unexpected system call %ld!\n", regs->reg_rax);
 
@@ -340,9 +344,51 @@ int syscall_page_alloc(uintptr_t addr) {
         return -1;
     }
     vmiter it(current->pagetable, addr);
-    it.map((uintptr_t) ptr, PTE_P | PTE_W | PTE_U);
+    it.map((uintptr_t) ptr, PTE_PWU);
     memset(ptr, 0, PAGESIZE);
     return 0;
+}
+
+// syscall_fork()
+//    Handles the SYSCALL_FORK system call.
+//    Implements the specification for `sys_fork` in `u-lib.hh`.
+
+pid_t syscall_fork() {
+    pid_t pid = -1;
+    for (pid_t i = 1; i < NPROC; i++) {
+        if (ptable[i].state == P_FREE) {
+            pid = i;
+            break;
+        }
+    }
+
+    // if no free process slot, return -1
+    if (pid == -1) {
+        return -1;
+    }
+
+    // initialize child process page table and copy data
+    ptable[pid].pagetable = kalloc_pagetable();
+    for (vmiter it(current->pagetable), it_child(ptable[pid].pagetable);
+         it_child.va() < MEMSIZE_VIRTUAL;
+         it += PAGESIZE, it_child += PAGESIZE) {
+        if (it.va() < PROC_START_ADDR) {
+            it_child.map(it.pa(), it.perm());
+        } else if (it.writable() && it.user()) {
+            void* ptr = kalloc(PAGESIZE);
+            memcpy(ptr, (void*) it.pa(), PAGESIZE);
+            it_child.map((uintptr_t) ptr, PTE_PWU);
+        }
+    }
+
+    // initialize child process registers
+    ptable[pid].regs = current->regs;
+    ptable[pid].regs.reg_rax = 0;
+
+    // set state as runnable
+    ptable[pid].state = P_RUNNABLE;
+    
+    return pid;
 }
 
 
