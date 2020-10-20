@@ -1,19 +1,19 @@
 #ifndef IOBENCH_H
 #define IOBENCH_H
-
 #define _GNU_SOURCE 1
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-#include <limits.h>
-#include <time.h>
+#include <clocale>
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <cstring>
+#include <climits>
+#include <ctime>
 
-static inline double tstamp(void) {
+static inline double tstamp() {
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
     return tv.tv_sec + tv.tv_nsec * 1.0e-9;
@@ -21,7 +21,12 @@ static inline double tstamp(void) {
 
 // Print a report to stderr of # bytes printed, elapsed time, and rate.
 static inline void report(size_t n, double elapsed) {
-    fprintf(stderr, "\r%10zd bytes   %8.3f sec   %12.0f bytes/sec     ",
+    static bool locale_set = false;
+    if (!locale_set) {
+        setlocale(LC_NUMERIC, "");
+        locale_set = true;
+    }
+    fprintf(stderr, "\r%'14zd bytes   %8.3f sec   %'16.0f bytes/sec   ",
             n, elapsed, n / elapsed);
 }
 

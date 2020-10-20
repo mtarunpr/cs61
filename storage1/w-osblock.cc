@@ -13,7 +13,7 @@ int main() {
     size_t size = 51200000;
     size_t block_size = 512;
     char* buf = (char*) malloc(block_size);
-    memset(buf, '7', block_size);
+    memset(buf, '6', block_size);
 
     double start = tstamp();
     size_t n = 0;
