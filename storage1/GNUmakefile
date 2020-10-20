@@ -1,6 +1,8 @@
-BASEPROGRAMS = $(sort $(patsubst %.cc,%,$(wildcard [rw][0-9]*.cc)))
+BASEPROGRAMS = $(sort $(patsubst %.cc,%,$(wildcard [rw]-*.cc)))
 PROGRAMS = $(BASEPROGRAMS)
 all: $(PROGRAMS) $(DATAFILE)
+
+variants = $(1) $(addsuffix -unsafe,$(1)) $(addsuffix -O0,$(1))
 
 -include config.mk
 ifndef DATAFILE
@@ -54,7 +56,6 @@ endif
 clean:
 	rm -f $(call variants,$(BASEPROGRAMS)) *.o data
 	rm -rf $(DEPSDIR) *.dSYM
-	for i in r[0-9][0-9]* w[0-9][0-9]*; do if file $$i | grep executable >/dev/null 2>&1; then rm -f $$i; fi; done
 
 .PHONY: all clean
 .PRECIOUS: %-O0.o %-O1.o %-unsafe.o

@@ -1,7 +1,7 @@
 data
-w[0-9][0-9]-syncbyte
-w[0-9][0-9]-syncblock
-w[0-9][0-9]-byte
-w[0-9][0-9]-block
-w[0-9][0-9]-stdiobyte
-w[0-9][0-9]-stdioblock
+w-syncbyte
+w-syncblock
+w-osbyte
+w-osblock
+w-stdiobyte
+w-stdioblock

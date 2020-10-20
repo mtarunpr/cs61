@@ -4,7 +4,6 @@ all: $(PROGRAMS) attack.txt~ attackfail.txt~
 
 variants = $(1) $(addsuffix -unsafe,$(1)) $(addsuffix -O0,$(1))
 
-
 PIE ?= 0
 O ?= 3
 COMPILER ?= gcc

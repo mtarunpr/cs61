@@ -21,7 +21,7 @@ static inline double tstamp(void) {
 
 // Print a report to stderr of # bytes printed, elapsed time, and rate.
 static inline void report(size_t n, double elapsed) {
-    fprintf(stderr, "\r%zd bytes   %.3f sec   %g byte/sec     ",
+    fprintf(stderr, "\r%zd bytes   %.3f sec   %.0f bytes/sec     ",
             n, elapsed, n / elapsed);
 }
 
