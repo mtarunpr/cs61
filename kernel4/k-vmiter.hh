@@ -38,6 +38,11 @@ class vmiter {
     inline bool user() const;
     // Return intersection of permissions in [va(), va() + sz)
     uint64_t range_perm(size_t sz) const;
+    // Return true iff `(perm() & desired_perm) == desired_perm`.
+    inline bool perm(uint64_t desired_perm) const;
+    // Return true iff `(range_perm(sz) & desired_perm) == desired_perm`.
+    inline bool range_perm(size_t sz, uint64_t desired_perm) const;
+
 
     // Move to virtual address `va`; return `*this`
     inline vmiter& find(uintptr_t va);
@@ -115,7 +120,7 @@ class ptiter {
     // Return level of current page table page (0-2)
     inline int level() const;
 
-    // Return first virtual address covered by current page table entry (0-511)
+    // Return first virtual address covered by entry `idx` in current pt
     inline uintptr_t entry_va(unsigned idx) const;
     // Return one past the last virtual address covered by entry
     inline uintptr_t entry_last_va(unsigned idx) const;
@@ -167,20 +172,25 @@ inline T vmiter::kptr() const {
     }
 }
 inline uint64_t vmiter::perm() const {
-    if (*pep_ & PTE_P) {
-        return *pep_ & perm_;
-    } else {
-        return 0;
-    }
+    // Returns 0-0xFFF. (XXX Does not track PTE_XD.)
+    // Returns 0 unless `(*pep_ & perm_ & PTE_P) != 0`.
+    uint64_t ph = *pep_ & perm_;
+    return ph & -(ph & PTE_P);
+}
+inline bool vmiter::perm(uint64_t desired_perm) const {
+    return (perm() & desired_perm) == desired_perm;
 }
 inline bool vmiter::present() const {
-    return (*pep_ & PTE_P) == PTE_P;
+    return perm(PTE_P);
 }
 inline bool vmiter::writable() const {
-    return (*pep_ & (PTE_P | PTE_W)) == (PTE_P | PTE_W);
+    return perm(PTE_P | PTE_W);
 }
 inline bool vmiter::user() const {
-    return (*pep_ & (PTE_P | PTE_U)) == (PTE_P | PTE_U);
+    return perm(PTE_P | PTE_U);
+}
+inline bool vmiter::range_perm(size_t sz, uint64_t desired_perm) const {
+    return (range_perm(sz) & desired_perm) == desired_perm;
 }
 inline vmiter& vmiter::find(uintptr_t va) {
     real_find(va);
@@ -197,7 +207,7 @@ inline void vmiter::next_range() {
 }
 inline void vmiter::map(uintptr_t pa, int perm) {
     int r = try_map(pa, perm);
-    assert(r == 0);
+    assert(r == 0, "vmiter::map failed");
 }
 inline void vmiter::map(void* kp, int perm) {
     map((uintptr_t) kp, perm);

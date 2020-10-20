@@ -78,7 +78,7 @@ __always_inline void access_memory(const void* ptr) {
 // System call declarations
 // Definitions and explanations of system calls are in `u-lib.cc`.
 pid_t sys_getpid();
-void sys_yield();
+int sys_yield();
 int sys_page_alloc(void* addr);
 int sys_getsysname(char* buf);
 [[noreturn]] void sys_panic(const char* msg);

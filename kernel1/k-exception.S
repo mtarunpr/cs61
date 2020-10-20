@@ -198,10 +198,11 @@ syscall_entry:
 
 
 proc_runnable_fail:
+        xorl %ecx, %ecx
         movq $proc_runnable_assert, %rdx
         xorl %esi, %esi
         movq $k_exception_str, %rdi
-        callq _Z11assert_failPKciS0_
+        callq _Z11assert_failPKciS0_S0_
 
 
 .section .rodata.str1.1

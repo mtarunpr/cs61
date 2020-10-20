@@ -120,7 +120,7 @@ class ptiter {
     // Return level of current page table page (0-2)
     inline int level() const;
 
-    // Return first virtual address covered by current page table entry (0-511)
+    // Return first virtual address covered by entry `idx` in current pt
     inline uintptr_t entry_va(unsigned idx) const;
     // Return one past the last virtual address covered by entry
     inline uintptr_t entry_last_va(unsigned idx) const;
@@ -172,11 +172,10 @@ inline T vmiter::kptr() const {
     }
 }
 inline uint64_t vmiter::perm() const {
-    if (*pep_ & PTE_P) {
-        return *pep_ & perm_;
-    } else {
-        return 0;
-    }
+    // Returns 0-0xFFF. (XXX Does not track PTE_XD.)
+    // Returns 0 unless `(*pep_ & perm_ & PTE_P) != 0`.
+    uint64_t ph = *pep_ & perm_;
+    return ph & -(ph & PTE_P);
 }
 inline bool vmiter::perm(uint64_t desired_perm) const {
     return (perm() & desired_perm) == desired_perm;

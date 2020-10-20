@@ -300,7 +300,7 @@ x86_64_pagetable* kalloc_pagetable() {
 //    are mapped at the expected addresses.
 
 void check_pagetable(x86_64_pagetable* pagetable) {
-    assert(((uintptr_t) pagetable & PAGEOFFMASK) == 0); // must be page aligned
+    assert(((uintptr_t) pagetable % PAGESIZE) == 0); // must be page aligned
     assert(vmiter(pagetable, (uintptr_t) exception_entry).pa()
            == kptr2pa(exception_entry));
     assert(vmiter(kernel_pagetable, (uintptr_t) pagetable).pa()
@@ -869,8 +869,12 @@ void panic_at(uintptr_t rsp, uintptr_t rbp, uintptr_t rip,
     fail();
 }
 
-void assert_fail(const char* file, int line, const char* msg) {
+void assert_fail(const char* file, int line, const char* msg,
+                 const char* description) {
     cursorpos = CPOS(23, 0);
+    if (description) {
+        error_printf("%s:%d: %s\n", file, line, description);
+    }
     error_printf("%s:%d: kernel assertion '%s' failed\n", file, line, msg);
     error_print_backtrace(rdrsp(), rdrbp());
     fail();

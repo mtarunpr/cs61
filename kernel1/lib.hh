@@ -20,6 +20,7 @@ void* memchr(const void* s, int c, size_t n);
 size_t strlen(const char* s);
 size_t strnlen(const char* s, size_t maxlen);
 char* strcpy(char* dst, const char* src);
+char* strncpy(char* dst, const char* src, size_t maxlen);
 int strcmp(const char* a, const char* b);
 int strncmp(const char* a, const char* b, size_t maxlen);
 int strcasecmp(const char* a, const char* b);
@@ -303,13 +304,14 @@ void error_printf(const char* format, ...)
 
 // assert(x)
 //    If `x == 0`, print a message and fail.
-#define assert(x)           do {                                        \
+#define assert(x, ...)       do {                                       \
         if (!(x)) {                                                     \
-            assert_fail(__FILE__, __LINE__, #x);                        \
+            assert_fail(__FILE__, __LINE__, #x, ## __VA_ARGS__);        \
         }                                                               \
-    } while (0)
-void __attribute__((noinline, noreturn, cold))
-assert_fail(const char* file, int line, const char* msg);
+    } while (false)
+__attribute__((noinline, noreturn, cold))
+void assert_fail(const char* file, int line, const char* msg,
+                 const char* description = nullptr);
 
 
 // assert_[eq, ne, lt, le, gt, ge](x, y)

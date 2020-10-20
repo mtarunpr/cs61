@@ -27,7 +27,7 @@ uint64_t vmiter::range_perm(size_t sz) const {
 
 void vmiter::down() {
     while (level_ > 0 && (*pep_ & (PTE_P | PTE_PS)) == PTE_P) {
-        perm_ &= *pep_;
+        perm_ &= *pep_ | ~(PTE_P | PTE_W | PTE_U);
         --level_;
         uintptr_t pa = *pep_ & PTE_PAMASK;
         x86_64_pagetable* pt = reinterpret_cast<x86_64_pagetable*>(pa);
@@ -70,13 +70,13 @@ int vmiter::try_map(uintptr_t pa, int perm) {
         pa = 0;
     }
     // virtual address is page-aligned
-    assert((va_ % PAGESIZE) == 0);
+    assert((va_ % PAGESIZE) == 0, "vmiter::try_map va not aligned");
     if (perm & PTE_P) {
         // if mapping present, physical address is page-aligned
-        assert(pa != (uintptr_t) -1);
-        assert((pa & PTE_PAMASK) == pa);
+        assert(pa != (uintptr_t) -1, "vmiter::try_map mapping nonexistent pa");
+        assert((pa & PTE_PAMASK) == pa, "vmiter::try_map pa not aligned");
     } else {
-        assert((pa & PTE_P) == 0);
+        assert((pa & PTE_P) == 0, "vmiter::try_map invalid pa");
     }
     // new permissions (`perm`) cannot be less restrictive than permissions
     // imposed by higher-level page tables (`perm_`)

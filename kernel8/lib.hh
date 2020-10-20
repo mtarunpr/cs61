@@ -323,7 +323,7 @@ void error_printf(const char* format, ...)
         if (!(x)) {                                                     \
             assert_fail(__FILE__, __LINE__, #x, ## __VA_ARGS__);        \
         }                                                               \
-    } while (0)
+    } while (false)
 __attribute__((noinline, noreturn, cold))
 void assert_fail(const char* file, int line, const char* msg,
                  const char* description = nullptr);
