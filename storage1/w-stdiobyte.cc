@@ -1,6 +1,8 @@
 #include "iobench.hh"
+bool quiet = false;
+double start_tstamp;
 
-int main() {
+int main(int argc, char* argv[]) {
     FILE* f = stdout;
     if (isatty(fileno(f))) {
         f = fopen(DATAFILE, "w");
@@ -11,8 +13,10 @@ int main() {
     }
 
     size_t size = 51200000;
+    parse_arguments(argc, argv, &size, nullptr);
+
     const char* buf = "6";
-    double start = tstamp();
+    start_tstamp = tstamp();
 
     size_t n = 0;
     while (n < size) {
@@ -23,11 +27,10 @@ int main() {
         }
         n += r;
         if (n % PRINT_FREQUENCY == 0) {
-            report(n, tstamp() - start);
+            report(n);
         }
     }
 
     fclose(f);
-    report(n, tstamp() - start);
-    fprintf(stderr, "\n");
+    report(n, true);
 }
