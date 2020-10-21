@@ -34,11 +34,11 @@ made by `w-osbyte` and prints those system calls to the terminal.
 > * `-q`: Print a single speed report at the end of the run, rather than
 >   continuously updating the speed report.
 
-Find the line of output that corresponds to the data being written to disk. It
-will come pretty late in the `strace` output—processes make many system calls
-as they boot that are not necessary to understand. If you can’t find it at
-first, try `strace ./w-osbyte -qs2`, `./w-osbyte -qs3`, `./w-osbyte -qs4`,
-etc.
+Find the line of output that corresponds to writing the data. This line will
+come pretty late in the `strace` output—processes make many system calls as
+they boot that are not necessary to understand. If you can’t find the critical
+line at first, try `strace ./w-osbyte -qs2`, `./w-osbyte -qs3`, `./w-osbyte
+-qs4`, etc.
 
 2\. Can you find a set of arguments for `./w-osblock` that produce an
 essentially identical system call trace to `./w-osbyte -qs3`?
