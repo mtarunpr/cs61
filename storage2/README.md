@@ -16,7 +16,8 @@ This advance work builds on the Storage 1 work, so do that if you haven’t.
 calls made by another process! This is an amazing debugging tool for figuring
 out process behavior.
 
-In the `../storage1` directory, build the `w` programs, then run:
+In the `../storage1` directory, build the `w` programs, then run (on Linux or
+Docker):
 
 ```sh
 $ strace ./w-osbyte -qs1
@@ -36,9 +37,8 @@ made by `w-osbyte` and prints those system calls to the terminal.
 
 Find the line of output that corresponds to writing the data. This line will
 come pretty late in the `strace` output—processes make many system calls as
-they boot that are not necessary to understand. If you can’t find the critical
-line at first, try `strace ./w-osbyte -qs2`, `./w-osbyte -qs3`, `./w-osbyte
--qs4`, etc.
+they boot that can be ignored for now. If you can’t find the critical line,
+try `strace ./w-osbyte -qs2`, `./w-osbyte -qs3`, `./w-osbyte -qs4`, etc.
 
 2\. Can you find a set of arguments for `./w-osblock` that produce an
 essentially identical system call trace to `./w-osbyte -qs3`?

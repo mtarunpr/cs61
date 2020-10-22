@@ -15,6 +15,8 @@ int main(int argc, char* argv[]) {
     size_t size = filesize(fileno(f));
     parse_arguments(argc, argv, &size, nullptr);
 
+    start_tstamp = tstamp();
+
     size_t n = 0;
     while (n < size) {
         int ch = fgetc(f);

@@ -17,6 +17,7 @@ int main(int argc, char* argv[]) {
     parse_arguments(argc, argv, &nwrite, nullptr);
 
     const char* buf = "6";
+    start_tstamp = tstamp();
 
     size_t pos = size;
     size_t n = 0;

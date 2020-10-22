@@ -16,6 +16,8 @@ int main(int argc, char* argv[]) {
     size_t nread = size;
     parse_arguments(argc, argv, &nread, nullptr);
 
+    start_tstamp = tstamp();
+
     off_t pos = size;
     size_t n = 0;
     while (n < nread) {

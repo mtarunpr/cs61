@@ -16,6 +16,7 @@ int main(int argc, char* argv[]) {
     parse_arguments(argc, argv, &size, nullptr);
 
     char* buf = (char*) malloc(1);
+    start_tstamp = tstamp();
 
     size_t n = 0;
     while (n < size) {
