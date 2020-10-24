@@ -81,7 +81,7 @@ void kernel_start(const char* command) {
     }
 
     // set up process descriptors
-    for (pid_t i = 0; i < NPROC; i++) {
+    for (pid_t i = 0; i < NPROC; ++i) {
         ptable[i].pid = i;
         ptable[i].state = P_FREE;
     }
@@ -136,8 +136,11 @@ void* kalloc(size_t sz) {
 //    If `kptr == nullptr` does nothing.
 
 void kfree(void* kptr) {
-    (void) kptr;
-    assert(false /* your code here */);
+    uintptr_t pa = (uintptr_t) kptr;
+    if (!kptr || (pa & (PAGESIZE - 1)) != 0 || !pages[pa / PAGESIZE].used()) {
+        return;
+    }
+    --pages[pa / PAGESIZE].refcount;
 }
 
 
@@ -161,9 +164,6 @@ void process_setup(pid_t pid, const char* program_name) {
     // obtain reference to the program image
     program_image pgm(program_name);
 
-    // change pagetable to process's pagetable
-    set_pagetable(ptable[pid].pagetable);
-
     // allocate and map all memory
     for (auto seg = pgm.begin(); seg != pgm.end(); ++seg) {
         for (uintptr_t a = round_down(seg.va(), PAGESIZE);
@@ -171,14 +171,15 @@ void process_setup(pid_t pid, const char* program_name) {
              a += PAGESIZE) {
             void* ptr = kalloc(PAGESIZE);
             it.find(a);
-            it.map((uintptr_t) ptr, PTE_PWU);
+            it.map(ptr, PTE_PWU);
         }
     }
 
     // copy instructions and data into place
     for (auto seg = pgm.begin(); seg != pgm.end(); ++seg) {
-        memset((void*) seg.va(), 0, seg.size());
-        memcpy((void*) seg.va(), seg.data(), seg.data_size());
+        it.find(seg.va());
+        memset(it.kptr(), 0, seg.size());
+        memcpy(it.kptr(), seg.data(), seg.data_size());
     }
 
     // mark entry point
@@ -188,7 +189,7 @@ void process_setup(pid_t pid, const char* program_name) {
     uintptr_t stack_addr = MEMSIZE_VIRTUAL - PAGESIZE;
     void* ptr = kalloc(PAGESIZE);
     it.find(stack_addr);
-    it.map((uintptr_t) ptr, PTE_PWU);
+    it.map(ptr, PTE_PWU);
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
 
     // mark process as runnable
@@ -282,6 +283,7 @@ void exception(regstate* regs) {
 
 int syscall_page_alloc(uintptr_t addr);
 pid_t syscall_fork();
+void syscall_exit(pid_t pid);
 
 uintptr_t syscall(regstate* regs) {
     // Copy the saved registers into the `current` process descriptor.
@@ -320,6 +322,10 @@ uintptr_t syscall(regstate* regs) {
     case SYSCALL_FORK:
         return syscall_fork();
 
+    case SYSCALL_EXIT:
+        syscall_exit(current->pid);
+        schedule();             // does not return
+
     default:
         panic("Unexpected system call %ld!\n", regs->reg_rax);
 
@@ -335,7 +341,7 @@ uintptr_t syscall(regstate* regs) {
 //    in `u-lib.hh` (but in the handout code, it does not).
 
 int syscall_page_alloc(uintptr_t addr) {
-    if (addr % PAGESIZE != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
+    if ((addr & (PAGESIZE - 1)) != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
         return -1;
     }
     void* ptr = kalloc(PAGESIZE);
@@ -344,7 +350,12 @@ int syscall_page_alloc(uintptr_t addr) {
         return -1;
     }
     vmiter it(current->pagetable, addr);
-    it.map((uintptr_t) ptr, PTE_PWU);
+    kfree(it.kptr());
+    int r = it.try_map(ptr, PTE_PWU);
+    if (r != 0) {
+        kfree(ptr);
+        return -1;
+    }
     memset(ptr, 0, PAGESIZE);
     return 0;
 }
@@ -355,7 +366,7 @@ int syscall_page_alloc(uintptr_t addr) {
 
 pid_t syscall_fork() {
     pid_t pid = -1;
-    for (pid_t i = 1; i < NPROC; i++) {
+    for (pid_t i = 1; i < NPROC; ++i) {
         if (ptable[i].state == P_FREE) {
             pid = i;
             break;
@@ -369,15 +380,38 @@ pid_t syscall_fork() {
 
     // initialize child process page table and copy data
     ptable[pid].pagetable = kalloc_pagetable();
+    if (!ptable[pid].pagetable) {
+        return -1;
+    }
     for (vmiter it(current->pagetable), it_child(ptable[pid].pagetable);
          it_child.va() < MEMSIZE_VIRTUAL;
          it += PAGESIZE, it_child += PAGESIZE) {
         if (it.va() < PROC_START_ADDR) {
-            it_child.map(it.pa(), it.perm());
+            int r = it_child.try_map(it.pa(), it.perm());
+
+            // if map failed, clean up and return -1
+            if (r != 0) {
+                syscall_exit(pid);
+                return -1;
+            }
         } else if (it.writable() && it.user()) {
             void* ptr = kalloc(PAGESIZE);
-            memcpy(ptr, (void*) it.pa(), PAGESIZE);
-            it_child.map((uintptr_t) ptr, PTE_PWU);
+
+            // if out of memory, clean up and return -1
+            if (!ptr) {
+                syscall_exit(pid);
+                return -1;
+            }
+
+            memcpy(ptr, it.kptr(), PAGESIZE);
+            int r = it_child.try_map(ptr, PTE_PWU);
+
+            // if map failed, clean up and return -1
+            if (r != 0) {
+                syscall_exit(pid);
+                kfree(ptr);
+                return -1;
+            }
         }
     }
 
@@ -391,6 +425,28 @@ pid_t syscall_fork() {
     return pid;
 }
 
+// syscall_exit()
+//    Handles the SYSCALL_EXIT system call.
+//    Implements the specification for `sys_exit` in `u-lib.hh`.
+
+void syscall_exit(pid_t pid) {
+    // free code, data, heap, and stack pages
+    for (vmiter it(ptable[pid].pagetable, PROC_START_ADDR);
+         it.va() < MEMSIZE_VIRTUAL;
+         it += PAGESIZE) {
+        if (it.user()) {
+            kfree(it.kptr());
+        }
+    }
+
+    // free page table pages
+    for (ptiter it(ptable[pid].pagetable); !it.done(); it.next()) {
+        kfree(it.kptr());
+    }
+    kfree(ptable[pid].pagetable);
+
+    ptable[pid].state = P_FREE;
+}
 
 // schedule
 //    Pick the next process to run and then run it.
