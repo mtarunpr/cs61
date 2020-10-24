@@ -171,7 +171,13 @@ void process_setup(pid_t pid, const char* program_name) {
              a += PAGESIZE) {
             void* ptr = kalloc(PAGESIZE);
             it.find(a);
-            it.map(ptr, PTE_PWU);
+            int flags;
+            if (seg.writable()) {
+                flags = PTE_PWU;
+            } else {
+                flags = PTE_P | PTE_U;
+            }
+            it.map(ptr, flags);
         }
     }
 
@@ -394,23 +400,34 @@ pid_t syscall_fork() {
                 syscall_exit(pid);
                 return -1;
             }
-        } else if (it.writable() && it.user()) {
-            void* ptr = kalloc(PAGESIZE);
+        } else if (it.user()) {
+            if (it.writable()) {
+                void* ptr = kalloc(PAGESIZE);
 
-            // if out of memory, clean up and return -1
-            if (!ptr) {
-                syscall_exit(pid);
-                return -1;
-            }
+                // if out of memory, clean up and return -1
+                if (!ptr) {
+                    syscall_exit(pid);
+                    return -1;
+                }
 
-            memcpy(ptr, it.kptr(), PAGESIZE);
-            int r = it_child.try_map(ptr, PTE_PWU);
+                memcpy(ptr, it.kptr(), PAGESIZE);
+                int r = it_child.try_map(ptr, it.perm());
 
-            // if map failed, clean up and return -1
-            if (r != 0) {
-                syscall_exit(pid);
-                kfree(ptr);
-                return -1;
+                // if map failed, clean up and return -1
+                if (r != 0) {
+                    syscall_exit(pid);
+                    kfree(ptr);
+                    return -1;
+                }
+            } else {
+                int r = it_child.try_map(it.pa(), it.perm());
+
+                // if map failed, clean up and return -1
+                if (r != 0) {
+                    syscall_exit(pid);
+                    return -1;
+                }
+                ++pages[it.pa() / PAGESIZE].refcount;
             }
         }
     }
