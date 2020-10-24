@@ -103,30 +103,34 @@ void kernel_start(const char* command) {
 //    Kernel memory allocator. Allocates `sz` contiguous bytes and
 //    returns a pointer to the allocated memory, or `nullptr` on failure.
 //
-//    The returned memory is initialized to 0xCC, which corresponds to
-//    the x86 instruction `int3` (this may help you debug). You'll
-//    probably want to reset it to something more useful.
+//    The returned memory is initialized to 0.
 //
 //    On WeensyOS, `kalloc` is a page-based allocator: if `sz > PAGESIZE`
 //    the allocation fails; if `sz < PAGESIZE` it allocates a whole page
 //    anyway.
 //
-//    The handout code returns the next allocatable free page it can find.
-//    It checks all pages. (You could maybe make this faster!)
+//    Returns the next allocatable free page it can find, starting from
+//    just after the most recently allocated page.
 
 void* kalloc(size_t sz) {
     if (sz > PAGESIZE) {
         return nullptr;
     }
-
-    for (uintptr_t pa = 0; pa != MEMSIZE_PHYSICAL; pa += PAGESIZE) {
+    
+    static uintptr_t start = 0;
+    uintptr_t pa = start;
+    do {
+        // cycle back to 0 if needed
+        pa = pa < MEMSIZE_PHYSICAL ? pa : pa - MEMSIZE_PHYSICAL;
         if (allocatable_physical_address(pa)
             && !pages[pa / PAGESIZE].used()) {
             ++pages[pa / PAGESIZE].refcount;
-            memset((void*) pa, 0xCC, PAGESIZE);
+            memset((void*) pa, 0, PAGESIZE);
+            start = pa + PAGESIZE;
             return (void*) pa;
         }
-    }
+        pa += PAGESIZE;
+    } while (pa != start);
     return nullptr;
 }
 
@@ -171,11 +175,9 @@ void process_setup(pid_t pid, const char* program_name) {
              a += PAGESIZE) {
             void* ptr = kalloc(PAGESIZE);
             it.find(a);
-            int flags;
+            int flags = PTE_P | PTE_U;
             if (seg.writable()) {
-                flags = PTE_PWU;
-            } else {
-                flags = PTE_P | PTE_U;
+                flags |= PTE_W;
             }
             it.map(ptr, flags);
         }
