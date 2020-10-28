@@ -22,6 +22,9 @@ int main(int argc, char* argv[]) {
         identity = "mama\n";
     }
 
+    // maybe reopen stdout
+    //freopen("data", "w", stdout);
+
     // print process’s identity 1,000,000 times
     if (use_stdio) {
         for (int i = 0; i != 1000000; ++i) {
