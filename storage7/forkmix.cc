@@ -28,7 +28,10 @@ int main(int argc, char* argv[]) {
     // print process’s identity 1,000,000 times
     if (use_stdio) {
         for (int i = 0; i != 1000000; ++i) {
-            fputs(identity, stdout);
+            for (const char* s = identity; *s; ++s) {
+                fputc(*s, stdout);
+            }
+            //fputs(identity, stdout);
         }
     } else {
         for (int i = 0; i != 1000000; ++i) {
