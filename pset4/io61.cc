@@ -63,16 +63,7 @@ int io61_readc(io61_file* f) {
 //    were read.
 
 ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
-    size_t nread = 0;
-    while (nread != sz) {
-        int ch = io61_readc(f);
-        if (ch == EOF) {
-            break;
-        }
-        buf[nread] = ch;
-        ++nread;
-    }
-    return nread;
+    return read(f->fd, buf, sz);  
 
     // Note: This function never returns -1 because `io61_readc`
     // does not distinguish between error and end-of-file.
@@ -102,18 +93,7 @@ int io61_writec(io61_file* f, int ch) {
 //    an error occurred before any characters were written.
 
 ssize_t io61_write(io61_file* f, const char* buf, size_t sz) {
-    size_t nwritten = 0;
-    while (nwritten != sz) {
-        if (io61_writec(f, buf[nwritten]) == -1) {
-            break;
-        }
-        ++nwritten;
-    }
-    if (nwritten != 0 || sz == 0) {
-        return nwritten;
-    } else {
-        return -1;
-    }
+    return write(f->fd, buf, sz);
 }
 
 
