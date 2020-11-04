@@ -24,6 +24,7 @@ int main() {
     } else {
         // Parent: Read all messages from child; exit when child
         // is done
+        close(pipefd[1]); // I no write!!!!
         while (true) {
             char buf[BUFSIZ];
             ssize_t nr = read(pipefd[0], buf, sizeof(buf));
