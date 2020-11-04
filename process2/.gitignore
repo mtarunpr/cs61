@@ -1,3 +1,5 @@
+childpipe
+execmyecho
 fork1
 fork2
 fork3
@@ -8,3 +10,4 @@ myecho
 runmyecho
 spawnmyecho
 waitdemo
+waitmyecho

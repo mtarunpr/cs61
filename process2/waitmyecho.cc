@@ -19,6 +19,16 @@ int main() {
         fprintf(stderr, "Error: execv returned %d in pid %d\n", r, getpid());
         exit(1);
     } else {
-        fprintf(stderr, "Parent pid %d forked child pid %d\n", getpid(), p);
+        fprintf(stderr, "Parent pid %d forked child pid %d, waiting...\n",
+                getpid(), p);
+
+        int status;
+        pid_t w = waitpid(p, &status, 0);
+        assert(w == p);
+        if (WIFEXITED(status)) {
+            fprintf(stderr, "Child exited with status %d\n", WEXITSTATUS(status));
+        } else {
+            fprintf(stderr, "Child exited abnormally [%x]\n", status);
+        }
     }
 }

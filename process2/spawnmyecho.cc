@@ -4,9 +4,7 @@
 int main() {
     const char* args[] = {
         "./myecho", // argv[0] is the string used to execute the program
-        "Hello!",
-        "Myecho should print these",
-        "arguments.",
+        "Hello, world",
         nullptr
     };
 
@@ -17,5 +15,6 @@ int main() {
                         (char**) args, nullptr);
 
     assert(r == 0);
-    fprintf(stderr, "Child pid %d should run myecho\n", p);
+    fprintf(stderr, "Parent pid %d spawned child pid %d with status %d\n",
+            getpid(), p, r);
 }

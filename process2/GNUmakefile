@@ -1,4 +1,5 @@
-BASEPROGRAMS = forkmyecho manyfork myecho runmyecho spawnmyecho waitdemo
+BASEPROGRAMS = forkmyecho manyfork myecho execmyecho spawnmyecho waitmyecho \
+	waitdemo childpipe
 PROGRAMS = $(BASEPROGRAMS)
 all: $(PROGRAMS) $(DATAFILE)
 
