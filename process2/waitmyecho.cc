@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <cstdio>
 #include <cassert>
+#include <cstdlib>
 #include <sys/wait.h>
 
 int main() {

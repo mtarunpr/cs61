@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cerrno>
 #include <cassert>
+#include <cstdlib>
 
 int main() {
     // Create pipe
