@@ -1,7 +1,8 @@
 CS61 2020: Process control 3
 ============================
 
-Today’s shorter meeting is about the benefits of pipes
+Today’s shorter meeting is about the benefits of pipes and software
+components.
 
 Advance work
 ------------
