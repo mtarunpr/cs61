@@ -4,6 +4,8 @@
 #include <climits>
 #include <cerrno>
 
+#define BUFSIZE 8192
+
 // io61.c
 //    YOUR CODE HERE!
 
@@ -13,6 +15,10 @@
 
 struct io61_file {
     int fd;
+    unsigned char buf[BUFSIZE];
+    off_t tag;
+    off_t end_tag;
+    off_t pos_tag;
 };
 
 
@@ -25,6 +31,9 @@ io61_file* io61_fdopen(int fd, int mode) {
     assert(fd >= 0);
     io61_file* f = new io61_file;
     f->fd = fd;
+    f->tag = 0;
+    f->end_tag = 0;
+    f->pos_tag = 0;
     (void) mode;
     return f;
 }
@@ -46,11 +55,20 @@ int io61_close(io61_file* f) {
 //    (which is -1) on error or end-of-file.
 
 int io61_readc(io61_file* f) {
-    unsigned char buf[1];
-    if (read(f->fd, buf, 1) == 1) {
-        return buf[0];
+    if (f->pos_tag + 1 <= f->end_tag) {
+        // Wholly within cache
+        f->pos_tag += 1;
+        return *(f->buf + f->pos_tag - f->tag - 1);
     } else {
-        return EOF;
+        // 
+        f->tag = f->pos_tag = f->end_tag;
+        ssize_t total_read = read(f->fd, f->buf, BUFSIZE);
+        if (total_read == 0) {
+            return EOF;
+        }
+        f->end_tag += total_read;
+        f->pos_tag += 1;
+        return *(f->buf + f->pos_tag - f->tag - 1);
     }
 }
 
@@ -63,12 +81,54 @@ int io61_readc(io61_file* f) {
 //    were read.
 
 ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
-    return read(f->fd, buf, sz);  
+    ssize_t sz_read = 0;
+    
+    // Check invariants
+    assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
+    assert(f->end_tag - f->pos_tag <= BUFSIZE);
 
-    // Note: This function never returns -1 because `io61_readc`
-    // does not distinguish between error and end-of-file.
-    // Your final version should return -1 if a system call indicates
-    // an error.
+    if (sz <= BUFSIZE && (ssize_t) (f->pos_tag + sz) <= f->end_tag) {
+        // Wholly within cache
+        memcpy(buf, f->buf + f->pos_tag - f->tag, sz);
+        f->pos_tag += sz;
+        sz_read = sz;
+    } else if (sz <= BUFSIZE) {
+        ssize_t sz_to_copy = sz;
+        if (f->end_tag > f->pos_tag) {
+            // Fill up rest of cache
+            sz_read = f->end_tag - f->pos_tag;
+            memcpy(buf, f->buf + f->pos_tag - f->tag, sz_read);
+            sz_to_copy -= sz_read;
+        }
+        // Cache empty/full; refill
+        f->tag = f->pos_tag = f->end_tag;
+        ssize_t total_read = read(f->fd, f->buf, BUFSIZE);
+        if (total_read < 0) {
+            return -1;
+        }
+        f->end_tag += total_read;
+        sz_to_copy = total_read >= sz_to_copy ? sz_to_copy : total_read;
+        memcpy(buf + sz_read, f->buf, sz_to_copy);
+        sz_read += sz_to_copy;
+        f->pos_tag += sz_to_copy;
+    } else {
+        // Too large for cache
+        if (f->end_tag > f->pos_tag) {
+            // Dump rest of cache
+            sz_read = f->end_tag - f->pos_tag;
+            memcpy(buf, f->buf + f->pos_tag - f->tag, sz_read);
+        }
+        // Read the remaining directly
+        ssize_t r = read(f->fd, buf + sz_read, sz - sz_read);
+        if (r < 0) {
+            // TODO: fix this to return memcpy'ed byte count?
+            return -1;
+        }
+        sz_read += r;
+        f->tag = f->pos_tag = f->end_tag = f->end_tag + r;
+    }
+
+    return sz_read;
 }
 
 
@@ -77,13 +137,21 @@ ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
 //    -1 on error.
 
 int io61_writec(io61_file* f, int ch) {
-    unsigned char buf[1];
-    buf[0] = ch;
-    if (write(f->fd, buf, 1) == 1) {
-        return 0;
+    const ssize_t filled_sz = f->pos_tag - f->tag;
+
+    if (filled_sz + 1 <= BUFSIZE) {
+        f->buf[filled_sz] = ch;
     } else {
-        return -1;
+        if (io61_flush(f) < 0) {
+            return -1;
+        }
+        f->buf[0] = ch;
     }
+
+    f->pos_tag += 1;
+    f->end_tag += 1;
+
+    return 0;
 }
 
 
@@ -93,7 +161,45 @@ int io61_writec(io61_file* f, int ch) {
 //    an error occurred before any characters were written.
 
 ssize_t io61_write(io61_file* f, const char* buf, size_t sz) {
-    return write(f->fd, buf, sz);
+    ssize_t sz_wrtn = sz;
+
+    // Check invariants
+    assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
+    assert(f->end_tag - f->pos_tag <= BUFSIZE);
+    assert(f->pos_tag == f->end_tag);
+
+    const ssize_t filled_sz = f->pos_tag - f->tag;
+    const ssize_t empty_sz = BUFSIZE - filled_sz;
+
+    if (sz <= BUFSIZE && filled_sz + sz <= BUFSIZE) {
+        // Wholly within cache
+        memcpy(f->buf + filled_sz, buf, sz);
+        f->pos_tag += sz;
+        f->end_tag += sz;
+    } else if (sz <= BUFSIZE) {
+        // Fill up rest of cache, flush, and refill
+        memcpy(f->buf + filled_sz, buf, empty_sz);
+        f->pos_tag += empty_sz;
+        f->end_tag += empty_sz;
+        if (io61_flush(f) < 0) {
+            return -1;
+        };
+        memcpy(f->buf, buf + empty_sz, sz - empty_sz);
+        f->pos_tag += sz - empty_sz;
+        f->end_tag += sz - empty_sz;
+    } else {
+        // Too large for cache
+        if (io61_flush(f) < 0) {
+            return -1;
+        };
+        sz_wrtn = write(f->fd, buf, sz);
+        if (sz_wrtn < 0) {
+            return -1;
+        }
+        f->tag = f->pos_tag = f->end_tag = f->end_tag + sz_wrtn;
+    }
+
+    return sz_wrtn;
 }
 
 
@@ -103,7 +209,22 @@ ssize_t io61_write(io61_file* f, const char* buf, size_t sz) {
 //    data buffered for reading, or do nothing.
 
 int io61_flush(io61_file* f) {
-    (void) f;
+    // Check invariants
+    assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
+    assert(f->end_tag - f->pos_tag <= BUFSIZE);
+
+    // Write cache invariant
+    assert(f->pos_tag == f->end_tag);
+
+    if (f->pos_tag - f->tag) {
+        ssize_t sz = write(f->fd, f->buf, f->pos_tag - f->tag);
+        if (sz < 0) {
+            return -1;
+        }
+        assert(sz == f->pos_tag - f->tag);
+        f->tag += sz;
+        return sz;
+    }
     return 0;
 }
 
