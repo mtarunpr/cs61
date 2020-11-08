@@ -56,11 +56,11 @@ int io61_close(io61_file* f) {
 
 int io61_readc(io61_file* f) {
     if (f->pos_tag + 1 <= f->end_tag) {
-        // Wholly within cache
+        // Within cache
         f->pos_tag += 1;
         return *(f->buf + f->pos_tag - f->tag - 1);
     } else {
-        // 
+        // Read and refill cache
         f->tag = f->pos_tag = f->end_tag;
         ssize_t total_read = read(f->fd, f->buf, BUFSIZE);
         if (total_read == 0) {
@@ -212,9 +212,6 @@ int io61_flush(io61_file* f) {
     // Check invariants
     assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
     assert(f->end_tag - f->pos_tag <= BUFSIZE);
-
-    // Write cache invariant
-    assert(f->pos_tag == f->end_tag);
 
     if (f->pos_tag - f->tag) {
         ssize_t sz = write(f->fd, f->buf, f->pos_tag - f->tag);
