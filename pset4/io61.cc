@@ -19,6 +19,8 @@ struct io61_file {
     off_t tag;
     off_t end_tag;
     off_t pos_tag;
+    off_t seek_idx;
+    int mode;
 };
 
 
@@ -34,7 +36,8 @@ io61_file* io61_fdopen(int fd, int mode) {
     f->tag = 0;
     f->end_tag = 0;
     f->pos_tag = 0;
-    (void) mode;
+    f->seek_idx = 0;
+    f->mode = mode;
     return f;
 }
 
@@ -55,6 +58,10 @@ int io61_close(io61_file* f) {
 //    (which is -1) on error or end-of-file.
 
 int io61_readc(io61_file* f) {
+    if (f->mode == O_WRONLY) {
+        return -1;
+    }
+
     if (f->pos_tag + 1 <= f->end_tag) {
         // Within cache
         f->pos_tag += 1;
@@ -68,7 +75,9 @@ int io61_readc(io61_file* f) {
         }
         f->end_tag += total_read;
         f->pos_tag += 1;
-        return *(f->buf + f->pos_tag - f->tag - 1);
+        unsigned char c = f->buf[f->seek_idx];
+        f->seek_idx = 0;
+        return c;
     }
 }
 
@@ -81,6 +90,10 @@ int io61_readc(io61_file* f) {
 //    were read.
 
 ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
+    if (f->mode == O_WRONLY) {
+        return -1;
+    }
+
     ssize_t sz_read = 0;
     
     // Check invariants
@@ -92,10 +105,10 @@ ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
         memcpy(buf, f->buf + f->pos_tag - f->tag, sz);
         f->pos_tag += sz;
         sz_read = sz;
-    } else if (sz <= BUFSIZE) {
+    } else if ((ssize_t) sz <= BUFSIZE - f->seek_idx) {
         ssize_t sz_to_copy = sz;
         if (f->end_tag > f->pos_tag) {
-            // Fill up rest of cache
+            // Dump rest of cache
             sz_read = f->end_tag - f->pos_tag;
             memcpy(buf, f->buf + f->pos_tag - f->tag, sz_read);
             sz_to_copy -= sz_read;
@@ -108,9 +121,10 @@ ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
         }
         f->end_tag += total_read;
         sz_to_copy = total_read >= sz_to_copy ? sz_to_copy : total_read;
-        memcpy(buf + sz_read, f->buf, sz_to_copy);
+        memcpy(buf + sz_read, f->buf + f->seek_idx, sz_to_copy);
         sz_read += sz_to_copy;
         f->pos_tag += sz_to_copy;
+        f->seek_idx = 0;
     } else {
         // Too large for cache
         if (f->end_tag > f->pos_tag) {
@@ -125,7 +139,8 @@ ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
             return -1;
         }
         sz_read += r;
-        f->tag = f->pos_tag = f->end_tag = f->end_tag + r;
+        f->tag = f->pos_tag = f->end_tag = f->end_tag + r + f->seek_idx;
+        f->seek_idx = 0;
     }
 
     return sz_read;
@@ -137,6 +152,10 @@ ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
 //    -1 on error.
 
 int io61_writec(io61_file* f, int ch) {
+    if (f->mode == O_RDONLY) {
+        return -1;
+    }
+
     const ssize_t filled_sz = f->pos_tag - f->tag;
 
     if (filled_sz + 1 <= BUFSIZE) {
@@ -161,6 +180,10 @@ int io61_writec(io61_file* f, int ch) {
 //    an error occurred before any characters were written.
 
 ssize_t io61_write(io61_file* f, const char* buf, size_t sz) {
+    if (f->mode == O_RDONLY) {
+        return -1;
+    }
+
     ssize_t sz_wrtn = sz;
 
     // Check invariants
@@ -209,9 +232,14 @@ ssize_t io61_write(io61_file* f, const char* buf, size_t sz) {
 //    data buffered for reading, or do nothing.
 
 int io61_flush(io61_file* f) {
+    if (f->mode == O_RDONLY) {
+        return 0;
+    }
+
     // Check invariants
     assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
     assert(f->end_tag - f->pos_tag <= BUFSIZE);
+    assert(f->pos_tag == f->end_tag);
 
     if (f->pos_tag - f->tag) {
         ssize_t sz = write(f->fd, f->buf, f->pos_tag - f->tag);
@@ -231,12 +259,25 @@ int io61_flush(io61_file* f) {
 //    Returns 0 on success and -1 on failure.
 
 int io61_seek(io61_file* f, off_t pos) {
-    off_t r = lseek(f->fd, (off_t) pos, SEEK_SET);
-    if (r == (off_t) pos) {
-        return 0;
+    if (f->mode == O_RDONLY) {
+        if (pos >= f->tag && pos < f->end_tag) {
+            f->pos_tag = pos;
+            return 0;
+        } else {
+            off_t aligned = pos - pos % BUFSIZE;
+            if (lseek(f->fd, aligned, SEEK_SET) != aligned) {
+                return -1;
+            }
+            f->tag = f->pos_tag = f->end_tag = aligned;
+            f->seek_idx = pos - aligned;
+        }
     } else {
-        return -1;
+        io61_flush(f);
+        if (lseek(f->fd, pos, SEEK_SET) != pos) {
+            return -1;
+        }
     }
+    return 0;
 }
 
 
