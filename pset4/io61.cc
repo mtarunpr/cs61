@@ -4,7 +4,7 @@
 #include <climits>
 #include <cerrno>
 
-#define BUFSIZE 8192
+#define BUFSIZE 16384
 
 // io61.c
 //    YOUR CODE HERE!
@@ -194,7 +194,7 @@ ssize_t io61_write(io61_file* f, const char* buf, size_t sz) {
     const ssize_t filled_sz = f->pos_tag - f->tag;
     const ssize_t empty_sz = BUFSIZE - filled_sz;
 
-    if (sz <= BUFSIZE && filled_sz + sz <= BUFSIZE) {
+    if (sz <= BUFSIZE && (ssize_t) sz <= empty_sz) {
         // Wholly within cache
         memcpy(f->buf + filled_sz, buf, sz);
         f->pos_tag += sz;
@@ -273,8 +273,15 @@ int io61_seek(io61_file* f, off_t pos) {
         }
     } else {
         io61_flush(f);
-        if (lseek(f->fd, pos, SEEK_SET) != pos) {
-            return -1;
+        if (pos >= f->tag && pos < f->end_tag) {
+            f->pos_tag = pos;
+            f->end_tag = pos;
+            return 0;
+        } else {
+            if (lseek(f->fd, pos, SEEK_SET) != pos) {
+                return -1;
+            }
+            f->tag = f->pos_tag = f->end_tag = pos;
         }
     }
     return 0;
