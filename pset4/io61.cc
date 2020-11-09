@@ -4,7 +4,7 @@
 #include <climits>
 #include <cerrno>
 
-#define BUFSIZE 16384
+#define BUFSIZE 4096
 
 // io61.c
 //    YOUR CODE HERE!
