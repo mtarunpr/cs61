@@ -4,7 +4,7 @@
 #include <climits>
 #include <cerrno>
 
-#define BUFSIZE 4096
+#define BUFSIZE 16384
 
 // io61.c
 //    YOUR CODE HERE!
@@ -135,8 +135,7 @@ ssize_t io61_read(io61_file* f, char* buf, size_t sz) {
         // Read the remaining directly
         ssize_t r = read(f->fd, buf + sz_read, sz - sz_read);
         if (r < 0) {
-            // TODO: fix this to return memcpy'ed byte count?
-            return -1;
+            return sz_read == 0 ? -1 : sz_read;
         }
         sz_read += r;
         f->tag = f->pos_tag = f->end_tag = f->end_tag + r + f->seek_idx;
@@ -273,16 +272,10 @@ int io61_seek(io61_file* f, off_t pos) {
         }
     } else {
         io61_flush(f);
-        if (pos >= f->tag && pos < f->end_tag) {
-            f->pos_tag = pos;
-            f->end_tag = pos;
-            return 0;
-        } else {
-            if (lseek(f->fd, pos, SEEK_SET) != pos) {
-                return -1;
-            }
-            f->tag = f->pos_tag = f->end_tag = pos;
+        if (lseek(f->fd, pos, SEEK_SET) != pos) {
+            return -1;
         }
+        f->tag = f->pos_tag = f->end_tag = pos;
     }
     return 0;
 }
