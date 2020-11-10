@@ -1,5 +1,5 @@
-#ifndef IOBENCH_H
-#define IOBENCH_H
+#ifndef IOBENCH_HH
+#define IOBENCH_HH
 #define _GNU_SOURCE 1
 #include <unistd.h>
 #include <sys/types.h>

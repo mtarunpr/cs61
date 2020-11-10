@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
+#include <cmath>
 #include <csignal>
 #include <ctime>
 #include <sys/wait.h>
@@ -35,6 +36,33 @@ inline int set_signal_handler(int signo, void (*handler)(int)) {
     sigemptyset(&sa.sa_mask);   // don't block other signals in handler
     sa.sa_flags = 0;            // don't restart system calls
     return sigaction(signo, &sa, nullptr);
+}
+
+
+// parse_arguments(argc, argv)
+//    Parse arguments for `-q`, `-e DELAY`, `-t DELAY`.
+
+inline void parse_arguments(int argc, char* argv[]) {
+    extern bool quiet;
+    extern double exit_delay, timeout;
+    int ch;
+    while ((ch = getopt(argc, argv, "qe:t:")) != -1) {
+        double* ptr = nullptr;
+        if (ch == 'e') {
+            ptr = &exit_delay;
+        } else if (ch == 't') {
+            ptr = &timeout;
+        } else if (ch == 'q') {
+            quiet = true;
+        }
+        if (ptr) {
+            char* endptr;
+            double val = strtod(optarg, &endptr);
+            if (*endptr == '\0') {
+                *ptr = val;
+            }
+        }
+    }
 }
 
 #endif
