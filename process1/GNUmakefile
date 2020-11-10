@@ -1,5 +1,4 @@
-BASEPROGRAMS = fork1 fork2 fork3 forkmix \
-	forkmyecho manyfork myecho runmyecho spawnmyecho waitdemo
+BASEPROGRAMS = fork1 fork2 fork3 forkmix
 PROGRAMS = $(BASEPROGRAMS)
 all: $(PROGRAMS) $(DATAFILE)
 
