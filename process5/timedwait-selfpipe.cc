@@ -18,6 +18,8 @@ int main(int argc, char** argv) {
     r = set_signal_handler(SIGCHLD, signal_handler);
     assert(r >= 0);
 
+    double start_time = tstamp();
+
     // Start a child
     pid_t p1 = fork();
     assert(p1 >= 0);
@@ -30,9 +32,8 @@ int main(int argc, char** argv) {
         }
         exit(0);
     }
-    double start_time = tstamp();
 
-    // Wait for 0.75 sec, or until a byte is written to `signalpipe`,
+    // Wait for `timeout` sec, or until a byte is written to `signalpipe`,
     // whichever happens first
     double timeout_intpart;
     double timeout_fracpart = modf(timeout, &timeout_intpart);

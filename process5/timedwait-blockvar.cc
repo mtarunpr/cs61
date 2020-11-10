@@ -16,6 +16,8 @@ int main(int argc, char** argv) {
     int r = set_signal_handler(SIGCHLD, signal_handler);
     assert(r >= 0);
 
+    double start_time = tstamp();
+
     // Start a child
     pid_t p1 = fork();
     assert(p1 >= 0);
@@ -28,7 +30,6 @@ int main(int argc, char** argv) {
         }
         exit(0);
     }
-    double start_time = tstamp();
 
     // Wait for the child and print its status
     if (!got_signal) {
