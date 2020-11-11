@@ -13,12 +13,6 @@ int main(int argc, char** argv) {
     // Demand that SIGALRM interrupt system calls
     int r = set_signal_handler(SIGALRM, signal_handler);
     assert(r >= 0);
-    // Set the timer
-    struct itimerval itimer;
-    timerclear(&itimer.it_interval);
-    itimer.it_value = make_timeval(timeout);
-    r = setitimer(ITIMER_REAL, &itimer, nullptr);
-    assert(r >= 0);
 
     double start_time = tstamp();
 
@@ -36,6 +30,12 @@ int main(int argc, char** argv) {
     }
 
     // Wait for the child and print its status
+    struct itimerval itimer;
+    timerclear(&itimer.it_interval);
+    itimer.it_value = make_timeval(timeout);
+    r = setitimer(ITIMER_REAL, &itimer, nullptr);
+    assert(r >= 0);
+
     int status;
     pid_t exited_pid = waitpid(p1, &status, 0);
 
