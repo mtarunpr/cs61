@@ -3,3 +3,4 @@ timedwait-block
 timedwait-blockvar
 timedwait-poll
 timedwait-selfpipe
+timedwait-signalfd

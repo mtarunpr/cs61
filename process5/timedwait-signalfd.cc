@@ -1,22 +1,23 @@
 #include "helpers.hh"
+#if __linux__
+#include <sys/signalfd.h>
+#endif
 bool quiet = false;
 double exit_delay = 0.5;
 double timeout = 0.75;
-int signalpipe[2];
-
-void signal_handler(int signal) {
-    (void) signal;
-    ssize_t r = write(signalpipe[1], "!", 1);
-    assert(r == 1);
-}
 
 int main(int argc, char** argv) {
     parse_arguments(argc, argv);
 
-    int r = pipe(signalpipe);
-    assert(r >= 0);
-    r = set_signal_handler(SIGCHLD, signal_handler);
-    assert(r >= 0);
+#if __linux__
+    // Create a signalfd
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    int r = sigprocmask(SIG_BLOCK, &mask, nullptr);
+    assert(r == 0);
+    int sigfd = signalfd(-1, &mask, SFD_CLOEXEC);
+    assert(sigfd >= 0);
 
     double start_time = tstamp();
 
@@ -33,13 +34,13 @@ int main(int argc, char** argv) {
         exit(0);
     }
 
-    // Wait for `timeout` sec, or until a byte is written to `signalpipe`,
+    // Wait for the timeout, or until something is written to `sigfd`,
     // whichever happens first
     fd_set fds;
     FD_ZERO(&fds);
-    FD_SET(signalpipe[0], &fds);
+    FD_SET(sigfd, &fds);
     struct timeval timeout_timeval = make_timeval(timeout);
-    r = select(signalpipe[0] + 1, &fds, nullptr, nullptr, &timeout_timeval);
+    r = select(sigfd + 1, &fds, nullptr, nullptr, &timeout_timeval);
 
     int status;
     pid_t exited_pid = waitpid(p1, &status, WNOHANG);
@@ -58,4 +59,10 @@ int main(int argc, char** argv) {
         fprintf(stderr, "%s child %d exited abnormally [%x]\n",
                 argv[0], p1, status);
     }
+
+#else
+    fprintf(stderr, "%s: This program only works on Linux.\n",
+            argv[0]);
+    exit(1);
+#endif
 }

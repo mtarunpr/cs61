@@ -25,6 +25,19 @@ inline double tstamp() {
 }
 
 
+// make_timeval(t)
+//    Return `t` as a `struct timeval`.
+
+inline struct timeval make_timeval(double d) {
+    double intpart;
+    double fracpart = modf(d, &intpart);
+    struct timeval tv = {
+        (long) intpart, (int) (fracpart * 1000000)
+    };
+    return tv;
+}
+
+
 // set_signal_handler(signo, handler)
 //    Install `handler` as the signal handler for `signo`.
 //    The `handler` is automatically re-installed after signal delivery.

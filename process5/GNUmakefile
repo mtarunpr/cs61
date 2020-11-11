@@ -1,5 +1,5 @@
 BASEPROGRAMS = timedwait-poll timedwait-block timedwait-blockvar \
-	timedwait-alarm timedwait-selfpipe
+	timedwait-alarm timedwait-selfpipe timedwait-signalfd
 PROGRAMS = $(BASEPROGRAMS)
 all: $(PROGRAMS) $(DATAFILE)
 
