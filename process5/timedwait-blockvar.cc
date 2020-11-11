@@ -39,6 +39,8 @@ int main(int argc, char** argv) {
     int status;
     pid_t exited_pid = waitpid(p1, &status, WNOHANG);
     assert(exited_pid == 0 || exited_pid == p1);
+
+    // Print results
     if (exited_pid == 0) {
         fprintf(stderr, "%s child %d timed out\n", argv[0], p1);
     } else if (WIFEXITED(status)) {

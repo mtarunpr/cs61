@@ -41,6 +41,8 @@ int main(int argc, char** argv) {
     // Wait for the child and print its status
     int status;
     pid_t exited_pid = waitpid(p1, &status, 0);
+
+    // Print results
     if (exited_pid == -1 && errno == EINTR) {
         fprintf(stderr, "%s parent interrupted by signal after %g sec\n",
                 argv[0], tstamp() - start_time);
