@@ -42,8 +42,10 @@ if test -n "$maindir" -a -z "$fresh"; then
     if test -n "$existing_image"; then
         created_at="`echo $existing_image | sed 's/,.*//'`"
         image="`echo $existing_image | sed 's/^.*,//'`"
-        echo "* Using running container `echo $image | head -c 12`, created $created_at" 1>&2
-        echo "  (\`cs61-run-docker -f\` would start a new container instead.)" 1>&2
+        image12="`echo $image | head -c 12`"
+        echo "* Using running container $image12, created $created_at" 1>&2
+        echo "- To start a new container, exit then \`cs61-run-docker -f\`" 1>&2
+        echo "- To kill this container, exit then \`docker kill $image12\`" 1>&2
         exec docker exec -it $image /bin/bash
     fi
 fi
