@@ -58,9 +58,18 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y install \
 
 # set up libraries
 RUN DEBIAN_FRONTEND=noninteractive apt-get -y install \
-    libreadline-dev \
-    locales \
-    wamerican
+        libreadline-dev \
+        locales \
+        wamerican
+
+# install programs used for networking
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install \
+        dnsutils \
+        inetutils-ping \
+        net-tools \
+        netcat \
+        telnet \
+        traceroute
 
 # set up default locale
 RUN locale-gen en_US.UTF-8
@@ -74,7 +83,7 @@ RUN useradd -m -s /bin/bash cs61-user && \
     echo "cs61-user ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/cs61-init
 
 # create binary reporting version of dockerfile
-RUN (echo '#\!/bin/sh'; echo 'echo 4') > /usr/bin/cs61-docker-version; chmod ugo+rx,u+w,go-w /usr/bin/cs61-docker-version
+RUN (echo '#\!/bin/sh'; echo 'echo 5') > /usr/bin/cs61-docker-version; chmod ugo+rx,u+w,go-w /usr/bin/cs61-docker-version
 
 # git build arguments
 ARG USER=CS61\ User

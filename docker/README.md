@@ -1,6 +1,10 @@
 CS 61 Docker
 ============
 
+> **tl;dr**:
+> * `docker build -t cs61:latest -f Dockerfile .` to build a Docker image
+> * `docker system prune -a` to remove old Docker images
+
 The [Docker][] container-based virtualization service lets you run a minimal
 CS 61 environment, including a virtual Linux host, on a Mac OS X or Windows
 host, without the overhead of a full virtual machine solution like [VMware
