@@ -57,7 +57,7 @@ int main()
     char client_ipstr[1024];
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ipstr, sizeof(client_ipstr));
 
-    char inbuf[1024], outbuf[1024];
+    char inbuf[1024] = "", outbuf[1024] = "";
     read(cfd, inbuf, sizeof(inbuf));
     printf("received a message from %s: %s\n", client_ipstr, inbuf); 
     strcpy(outbuf, "hello from server");

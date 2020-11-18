@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     }
 
     //send messages
-    char outbuf[1024], inbuf[1024];
+    char outbuf[1024] = "", inbuf[1024] = "";
     strcpy(outbuf, "Hello from client"); 
     write(fd, outbuf, strlen(outbuf)); 
     printf("Send a message: %s\n", outbuf);
