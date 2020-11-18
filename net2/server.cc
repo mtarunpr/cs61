@@ -1,9 +1,8 @@
 #include "helpers.hh"
 #include <netdb.h>
 
-int main() 
-{
-  int port = 6169;
+int main() {
+    int port = 6169;
 
     // Create socket
     int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -35,7 +34,7 @@ int main()
 
     // Actually start listening
     r = listen(fd, 100);
-    printf("start listening on port %d\n", port);
+    fprintf(stderr, "./server: Start listening on port %d\n", port);
     if (r < 0) {
         perror("listen");
         close(fd);
@@ -57,11 +56,11 @@ int main()
 
     char inbuf[1024] = "", outbuf[1024] = "";
     read(cfd, inbuf, sizeof(inbuf));
-    printf("received a message from %s: %s\n", client_ipstr, inbuf); 
+    fprintf(stderr, "./server: Receives message from %s: %s\n", client_ipstr, inbuf);
     strcpy(outbuf, "hello from server");
     write(cfd, outbuf, strlen(outbuf));
-    printf("send a message: %s\n", outbuf);
-    
+    fprintf(stderr, "./server: Sends message to %s: %s\n", client_ipstr, outbuf);
+
     close(cfd);
     close(fd);
 
