@@ -1,8 +1,6 @@
 #include "helpers.hh"
 #include <netdb.h>
 
-#define BUFSIZE 1024
-
 int main() 
 {
   int port = 6169;
