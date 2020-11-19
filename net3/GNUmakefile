@@ -1,5 +1,5 @@
 DB_PROGRAMS = $(sort $(patsubst %.cc,%,$(wildcard weensydb-??.cc)))
-PROGRAMS = wdbclient wdbclientloop wdbblaster $(DB_PROGRAMS)
+PROGRAMS = wdbclient wdbclientloop wdbblaster $(DB_PROGRAMS) incr-basic
 
 all: $(PROGRAMS)
 
@@ -17,6 +17,8 @@ CXXFLAGS += -Wno-unused-result
 %: %.o helpers.o
 	$(CXX) $(CXXFLAGS) $(O) -o $@ $^ $(LDFLAGS) $(LIBS)
 
+%.noopt: %.noopt.o
+	$(CXX) $(CXXFLAGS) -O0 -o $@ $^ $(LDFLAGS) $(LIBS)
 
 diffs.txt: always
 	rm -f diffs.txt; last=; for i in $(patsubst %,%.cc,$(DB_PROGRAMS)); do if test -n "$$last"; then diff -u $$last $$i >>diffs.txt; fi; last="$$i"; done
