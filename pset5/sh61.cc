@@ -57,9 +57,25 @@ command::~command() {
 pid_t command::make_child(pid_t pgid) {
     assert(this->args.size() > 0);
     (void) pgid; // You won’t need `pgid` until part 8.
-    // Your code here!
 
-    fprintf(stderr, "command::make_child not done yet\n");
+    // Set up argument vector
+    const char* argv[args.size() + 1];
+    for (size_t i = 0; i < args.size(); ++i) {
+        argv[i] = this->args[i].c_str();
+    }
+    argv[args.size()] = nullptr;
+
+    pid_t child_pid = fork();
+    if (child_pid == 0) {
+        // Child process
+        if (execvp(argv[0], (char**) argv) == -1) {
+            _exit(EXIT_FAILURE);
+        }
+    } else {
+        // Parent process
+        this->pid = child_pid;
+    }
+
     return this->pid;
 }
 
@@ -87,7 +103,9 @@ pid_t command::make_child(pid_t pgid) {
 
 void run(command* c) {
     c->make_child(0);
-    fprintf(stderr, "command::run not done yet\n");
+    int wstatus;
+    pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
+    assert(c->pid == exited_pid);
 }
 
 
