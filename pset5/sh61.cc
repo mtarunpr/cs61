@@ -73,7 +73,10 @@ pid_t command::make_child(pid_t pgid) {
     argv[args.size()] = nullptr;
 
     pid_t child_pid = fork();
-    if (child_pid == 0) {
+    if (child_pid == -1) {
+        fprintf(stderr, "Unable to fork\n");
+        return -1;
+    } else if (child_pid == 0) {
         // Child process
         if (execvp(argv[0], (char**) argv) == -1) {
             _exit(EXIT_FAILURE);
@@ -86,6 +89,57 @@ pid_t command::make_child(pid_t pgid) {
     return this->pid;
 }
 
+
+// run_conditional(c, bg)
+//    Run the conditional chain of commands starting with `c`
+//    in the background (if `bg` is true) or the foreground (otherwise).
+
+void run_conditional(command *c, bool bg) {
+    pid_t pid = -1;
+    if (bg) {
+        // Create new shell for background process
+        pid = fork();
+        if (pid == -1) {
+            fprintf(stderr, "Unable to fork\n");
+            return;
+        }
+    }
+
+    if (!bg || pid == 0) {
+        while (true) {
+            // Run command and wait for command to terminate
+            c->make_child(0);
+            int wstatus;
+            pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
+            assert(c->pid == exited_pid);
+
+            // Handle conditionals
+            if (WIFEXITED(wstatus)) {
+                while ((WEXITSTATUS(wstatus) == 0 && c->link == TYPE_OR)
+                    || (WEXITSTATUS(wstatus) != 0 && c->link == TYPE_AND)) {
+                    // Skip each command whose exit status is irrelevant to conditional
+                    if (c->link != TYPE_BACKGROUND && c->link != TYPE_SEQUENCE) {
+                        c = c->next;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            // If next is within this conditional, run it in same shell
+            if (c->link != TYPE_BACKGROUND && c->link != TYPE_SEQUENCE) {
+                c = c->next;
+            } else {
+                break;
+            }
+        }
+        
+        if (pid == 0) {
+            // If this is a child shell, terminate
+            _exit(EXIT_SUCCESS);
+        }
+    }
+}
 
 // run(c)
 //    Run the command *list* starting at `c`. Initially this just calls
@@ -109,12 +163,12 @@ pid_t command::make_child(pid_t pgid) {
 //       - Call `claim_foreground(0)` once the pipeline is complete.
 
 void run(command* c) {
-    c->make_child(0);
-    if (c->link != TYPE_BACKGROUND) {
-        int wstatus;
-        pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
-        assert(c->pid == exited_pid);
+    command* front = c;
+    // Seek to end of conditional
+    while (c->link != TYPE_SEQUENCE && c->link != TYPE_BACKGROUND) {
+        c = c->next;
     }
+    run_conditional(front, c->link == TYPE_BACKGROUND);
     if (c->next) {
         run(c->next);
     }
