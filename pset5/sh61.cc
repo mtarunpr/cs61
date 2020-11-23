@@ -12,7 +12,8 @@
 struct command {
     std::vector<std::string> args;
     pid_t pid;      // process ID running this command, -1 if none
-    int type;
+    command* next;
+    int link;
 
     command();
     ~command();
@@ -27,6 +28,8 @@ struct command {
 
 command::command() {
     this->pid = -1;
+    this->next = nullptr;
+    this->link = TYPE_SEQUENCE;
 }
 
 
@@ -34,6 +37,9 @@ command::command() {
 //    This destructor function is called to delete a command.
 
 command::~command() {
+    if (this->next) {
+        delete this->next;
+    }
 }
 
 
@@ -104,10 +110,13 @@ pid_t command::make_child(pid_t pgid) {
 
 void run(command* c) {
     c->make_child(0);
-    if (c->type != TYPE_BACKGROUND) {
+    if (c->link != TYPE_BACKGROUND) {
         int wstatus;
         pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
         assert(c->pid == exited_pid);
+    }
+    if (c->next) {
+        run(c->next);
     }
 }
 
@@ -124,18 +133,29 @@ command* parse_line(const char* s) {
     // Build the command
     // The handout code treats every token as a normal command word.
     // You'll add code to handle operators.
+    command* front = nullptr;
     command* c = nullptr;
     for (shell_token_iterator it = parser.begin(); it != parser.end(); ++it) {
-        if (!c) {
-            c = new command;
+        if (!front) {
+            front = new command;
+            c = front;
+        } else {
+            c->next = new command;
+            c = c->next;
         }
 
-        if (it.type() == TYPE_NORMAL) {
+        while (it.type() == TYPE_NORMAL) {
             c->args.push_back(it.str());
+            ++it;
+            if (it == parser.end()) {
+                c->link = TYPE_SEQUENCE;
+                return front;
+            }
         }
-        c->type = it.type();
+
+        c->link = it.type();
     }
-    return c;
+    return front;
 }
 
 
