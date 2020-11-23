@@ -12,6 +12,7 @@
 struct command {
     std::vector<std::string> args;
     pid_t pid;      // process ID running this command, -1 if none
+    int type;
 
     command();
     ~command();
@@ -103,9 +104,11 @@ pid_t command::make_child(pid_t pgid) {
 
 void run(command* c) {
     c->make_child(0);
-    int wstatus;
-    pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
-    assert(c->pid == exited_pid);
+    if (c->type != TYPE_BACKGROUND) {
+        int wstatus;
+        pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
+        assert(c->pid == exited_pid);
+    }
 }
 
 
@@ -126,7 +129,11 @@ command* parse_line(const char* s) {
         if (!c) {
             c = new command;
         }
-        c->args.push_back(it.str());
+
+        if (it.type() == TYPE_NORMAL) {
+            c->args.push_back(it.str());
+        }
+        c->type = it.type();
     }
     return c;
 }
