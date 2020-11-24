@@ -10,10 +10,11 @@
 //    Data structure describing a command. Add your own stuff.
 
 struct command {
-    std::vector<std::string> args;
+    std::vector<std::string> args;   // vector of arguments
     pid_t pid;      // process ID running this command, -1 if none
-    command* next;
-    int link;
+    command* next;  // next command in linked list
+    int link;       // control operator terminating this command
+    int readfd;     // read-end fd if read end of pipe, -1 otherwise
 
     command();
     ~command();
@@ -30,6 +31,7 @@ command::command() {
     this->pid = -1;
     this->next = nullptr;
     this->link = TYPE_SEQUENCE;
+    this->readfd = -1;
 }
 
 
@@ -72,27 +74,84 @@ pid_t command::make_child(pid_t pgid) {
     }
     argv[args.size()] = nullptr;
 
+    // Set up pipeline if necessary
+    int pfd[2];
+    if (this->link == TYPE_PIPE && pipe(pfd) == -1) {
+        fprintf(stderr, "Pipe failed.");
+        return -1;
+    }
+
     pid_t child_pid = fork();
     if (child_pid == -1) {
         fprintf(stderr, "Unable to fork\n");
         return -1;
     } else if (child_pid == 0) {
         // Child process
+        // Pipe dance (writer)
+        if (this->link == TYPE_PIPE) {
+            close(pfd[0]);
+            dup2(pfd[1], 1);
+            close(pfd[1]);
+        }
+        // Pipe dance (reader)
+        if (this->readfd != -1) {
+            dup2(this->readfd, 0);
+            close(this->readfd);
+        }
+        // Execute process
         if (execvp(argv[0], (char**) argv) == -1) {
             _exit(EXIT_FAILURE);
         }
     } else {
         // Parent process
         this->pid = child_pid;
+        // Pipe dance (parent of writer)
+        if (this->link == TYPE_PIPE) {
+            close(pfd[1]);
+            this->next->readfd = pfd[0];
+        }
+        // Pipe dance (parent of reader)
+        if (this->readfd != -1) {
+            close(this->readfd);
+        }
     }
 
     return this->pid;
 }
 
 
+// run_pipeline(command *c)
+//    Run the pipeline of commands starting with `c`
+
+void run_pipeline(command *c) {
+    c->make_child(0);
+    if (c->link != TYPE_PIPE) {
+        return;
+    }
+    if (c->next) {
+        run_pipeline(c->next);
+    }
+}
+
+
+// get_cond_type(c)
+//    Returns conditional operator following the pipeline
+//    `c` is in, or -1 if none
+
+int get_cond_type(command* c) {
+    if (c->link == TYPE_PIPE) {
+        return get_cond_type(c->next);
+    } else if (c->link == TYPE_AND || c->link == TYPE_OR) {
+        return c->link;
+    } else {
+        return -1;
+    }
+}
+
+
 // run_conditional(c, bg)
-//    Run the conditional chain of commands starting with `c`
-//    in the background (if `bg` is true) or the foreground (otherwise).
+//    Run the conditional chain of pipelines starting with `c`
+//    in the background (if `bg` is true) or foreground (otherwise).
 
 void run_conditional(command *c, bool bg) {
     pid_t pid = -1;
@@ -107,21 +166,26 @@ void run_conditional(command *c, bool bg) {
 
     if (!bg || pid == 0) {
         while (true) {
-            // Run command and wait for command to terminate
-            c->make_child(0);
+            // Run pipeline
+            run_pipeline(c);
+            // Seek to end of pipeline 
+            while (c->link == TYPE_PIPE) {
+                c = c->next;
+            }
+            
+            // Wait for last command in pipeline to terminate
             int wstatus;
             pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
             assert(c->pid == exited_pid);
 
             // Handle conditionals
             if (WIFEXITED(wstatus)) {
-                while ((WEXITSTATUS(wstatus) == 0 && c->link == TYPE_OR)
-                    || (WEXITSTATUS(wstatus) != 0 && c->link == TYPE_AND)) {
-                    // Skip each command whose exit status is irrelevant to conditional
-                    if (c->link != TYPE_BACKGROUND && c->link != TYPE_SEQUENCE) {
+                // Skip each command whose exit status is irrelevant to conditional
+                while ((WEXITSTATUS(wstatus) == 0 && get_cond_type(c) == TYPE_OR)
+                       || (WEXITSTATUS(wstatus) != 0 && get_cond_type(c) == TYPE_AND)) {
+                    c = c->next;
+                    while (c->link == TYPE_PIPE) {
                         c = c->next;
-                    } else {
-                        break;
                     }
                 }
             }
@@ -140,6 +204,7 @@ void run_conditional(command *c, bool bg) {
         }
     }
 }
+
 
 // run(c)
 //    Run the command *list* starting at `c`. Initially this just calls
