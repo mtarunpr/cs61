@@ -79,7 +79,7 @@ void handle_connection(int cfd) {
             }
 
             // set value
-            it->value = value;
+            it->value.swap(value);
             void* ptr = &*it;
             hash_mutex[b].unlock();
 

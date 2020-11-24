@@ -63,7 +63,7 @@ void handle_connection(int cfd) {
             }
 
             // set value
-            it->value = std::string(sz, '\0');
+            it->value.assign(sz, '\0');
             fread(it->value.data(), 1, sz, fin);
             fprintf(f, "STORED %p\r\n", &*it);
             fflush(f);

@@ -65,13 +65,13 @@ void handle_connection(int cfd) {
             }
 
             // set value
-            it->value = std::string(sz, '\0');
+            it->value.assign(sz, '\0');
             fread(it->value.data(), 1, sz, fin);
             fprintf(f, "STORED %p\r\n", &*it);
             fflush(f);
 
 	    fprintf(stderr, "SET key %s, value %s\n", key, it->value.data());
-	    
+
         } else if (sscanf(buf, "delete %s ", key) == 1) {
             // find item
             auto b = string_hash(key) % NBUCKETS;
@@ -87,7 +87,7 @@ void handle_connection(int cfd) {
             }
             fflush(f);
 
-	    fprintf(stderr, "DELETED key %s, value %s\n", key, it->value.data());
+	    fprintf(stderr, "DELETE key %s\n", key);
 
         } else if (remove_trailing_whitespace(buf)) {
             fprintf(f, "ERROR\r\n");

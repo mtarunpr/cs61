@@ -83,7 +83,7 @@ void handle_connection(int cfd) {
             }
 
             // set value
-            it->value = value;
+            it->value.swap(value);
             void* ptr = &*it;
             hash_mutex[b].unlock();
 
@@ -113,7 +113,7 @@ void handle_connection(int cfd) {
             }
             fflush(f);
 
-	} else if (remove_trailing_whitespace(buf)) {
+        } else if (remove_trailing_whitespace(buf)) {
             fprintf(f, "ERROR\r\n");
             fflush(f);
         }
