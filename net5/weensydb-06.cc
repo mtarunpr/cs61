@@ -14,6 +14,10 @@ struct hash_item {
 std::list<hash_item> hash[NBUCKETS];
 std::mutex hash_mutex[NBUCKETS];
 
+std::mutex thread_mutex;
+std::condition_variable thread_cv;
+int nthreads;
+
 
 // hash_get(key, create)
 //    Looks up `key` in the hashtable, `hash`, and returns
@@ -36,7 +40,7 @@ void handle_connection(int cfd) {
     FILE* fin = fdopen(cfd, "r");
     FILE* f = fdopen(cfd, "w");
 
-    char buf[BUFSIZ], key[BUFSIZ], key2[BUFSIZ];
+    char buf[BUFSIZ], key[BUFSIZ];
     size_t sz;
 
     while (fgets(buf, BUFSIZ, fin)) {
@@ -109,28 +113,7 @@ void handle_connection(int cfd) {
             }
             fflush(f);
 
-        } else if (sscanf(buf, "exch %s %s ", key, key2) == 2) {
-            // find item
-            auto b1 = string_hash(key) % NBUCKETS;
-            auto b2 = string_hash(key2) % NBUCKETS;
-            hash_mutex[b1].lock();
-            hash_mutex[b2].lock();
-            auto it1 = hfind(hash[b1], key);
-            auto it2 = hfind(hash[b2], key2);
-
-            // exchange items
-            if (it1 != hash[b1].end() && it2 != hash[b2].end()) {
-                std::swap(it1->value, it2->value);
-                fprintf(f, "EXCHANGED %p %p\r\n", &*it1, &*it2);
-            } else {
-                fprintf(f, "NOT_FOUND\r\n");
-            }
-            fflush(f);
-
-            hash_mutex[b1].unlock();
-            hash_mutex[b2].unlock();
-            
-        } else if (remove_trailing_whitespace(buf)) {
+	} else if (remove_trailing_whitespace(buf)) {
             fprintf(f, "ERROR\r\n");
             fflush(f);
         }
@@ -141,6 +124,11 @@ void handle_connection(int cfd) {
     }
     fclose(fin); // also closes `f`'s underlying fd
     (void) fclose(f);
+
+    // mark thread as closed
+    std::unique_lock<std::mutex> guard(thread_mutex);
+    --nthreads;
+    thread_cv.notify_all();
 }
 
 
@@ -164,6 +152,13 @@ int main(int argc, char** argv) {
             perror("accept");
             exit(1);
         }
+
+        // At most 100 threads at a time
+        std::unique_lock<std::mutex> guard(thread_mutex);
+        while (nthreads == 100) {
+            thread_cv.wait(guard);
+        }
+        ++nthreads;
 
         // Handle connection
         std::thread t(handle_connection, cfd);

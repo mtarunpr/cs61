@@ -40,7 +40,8 @@ void handle_connection(int cfd) {
 
     while (fgets(buf, BUFSIZ, fin)) {
         if (sscanf(buf, "get %s ", key) == 1) {
-            // find item
+	    fprintf(stderr, "Client %d: Start GET key %s\n", cfd, key);	    
+	  // find item
             auto b = string_hash(key) % NBUCKETS;
             auto it = hfind(hash[b], key);
 
@@ -54,7 +55,9 @@ void handle_connection(int cfd) {
             fprintf(f, "END\r\n");
             fflush(f);
 
+	    fprintf(stderr, "Client %d: Finish GET key %s, value %s\n", cfd, key, it->value.data());	    
         } else if (sscanf(buf, "set %s %zu ", key, &sz) == 2) {
+	    fprintf(stderr, "Clinet %d: Start SET key %s\n", cfd, key);
             // find item; insert if missing
             auto b = string_hash(key) % NBUCKETS;
             auto it = hfind(hash[b], key);
@@ -68,7 +71,11 @@ void handle_connection(int cfd) {
             fprintf(f, "STORED %p\r\n", &*it);
             fflush(f);
 
+	    fprintf(stderr, "Clinet %d: Finish SET key %s, value %s\n", cfd, key, it->value.data());
+
         } else if (sscanf(buf, "delete %s ", key) == 1) {
+	    fprintf(stderr, "Client %d: Start DELETED key %s\n", cfd, key);
+
             // find item
             auto b = string_hash(key) % NBUCKETS;
             auto it = hfind(hash[b], key);
@@ -83,10 +90,13 @@ void handle_connection(int cfd) {
             }
             fflush(f);
 
+	    fprintf(stderr, "Client %d: Finish DELETED key %s, value %s\n", cfd, key, it->value.data());
+
         } else if (remove_trailing_whitespace(buf)) {
             fprintf(f, "ERROR\r\n");
             fflush(f);
         }
+
     }
 
     if (ferror(fin)) {
