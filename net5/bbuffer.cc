@@ -15,9 +15,8 @@ struct bbuffer {
     bool write_closed_ = false;
     std::mutex mutex_;
 
-    std::condition_variable nonempty_; //unblock when nonempty
-    std::condition_variable nonfull_; //unblock when nonfull
-  
+    // **** Add condition variables here ****
+
     ssize_t read(char* buf, size_t sz);
     ssize_t write(const char* buf, size_t sz);
     void shutdown_write();
@@ -28,11 +27,11 @@ ssize_t bbuffer::write(const char* buf, size_t sz) {
     assert(!this->write_closed_);
     size_t pos = 0;
 
-    //****add code here:****
-    //Writer should block when the buffer is full (this->blen_ == bcapacity)
-    //and unlock when the buffer becomes nonfull 
+    // **** Add code here: ****
+    // If the buffer is initially full (this->blen_ == bcapacity), then
+    // writer should block until it becomes nonfull.
 
-    //Copying data from buf to bbuf, no need to understand the details
+    // Copy data from buf to bbuf, no need to understand the details
     while (pos < sz && this->blen_ < bcapacity) {
         size_t bindex = (this->bpos_ + this->blen_) % bcapacity;
         this->bbuf_[bindex] = buf[pos];
@@ -40,9 +39,9 @@ ssize_t bbuffer::write(const char* buf, size_t sz) {
         ++pos;
     }
 
-    //****add code here:****
-    //notify readers if needed
-    
+    // **** Add code here: ****
+    // Writer should notify readers if necessary.
+
     if (pos == 0 && sz > 0) {
         return -1;  // try again
     } else {
@@ -54,11 +53,11 @@ ssize_t bbuffer::read(char* buf, size_t sz) {
     std::unique_lock<std::mutex> guard(this->mutex_);
     size_t pos = 0;
 
-    //****add code here:****
-    //Reader should block when the buffer is empty (this->blen_ == 0)
-    //and unlock when the buffer becomes nonfull 
-    
-    //copying data from bbuf to buf, no need to understand the details
+    // **** Add code here: ****
+    // If the buffer is initially empty (this->blen_ == 0), then
+    // reader should block until it becomes nonempty or closed.
+
+    // Copy data from bbuf to buf, no need to understand the details
     while (pos < sz && this->blen_ > 0) {
         buf[pos] = this->bbuf_[this->bpos_];
         this->bpos_ = (this->bpos_ + 1) % bcapacity;
@@ -66,8 +65,8 @@ ssize_t bbuffer::read(char* buf, size_t sz) {
         ++pos;
     }
 
-    //****add code here:****
-    //notify writers if needed
+    // **** Add code here: ****
+    // Reader should notify writers if necessary.
 
     if (pos == 0 && sz > 0 && !this->write_closed_) {
         return -1;  // try again
@@ -79,6 +78,7 @@ ssize_t bbuffer::read(char* buf, size_t sz) {
 void bbuffer::shutdown_write() {
     std::unique_lock<std::mutex> guard(this->mutex_);
     this->write_closed_ = true;
+    // **** Do you need to notify any threads? ****
 }
 
 
