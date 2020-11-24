@@ -9,7 +9,7 @@ Advance work
 *Advance work should be completed before lecture, especially by active
 listeners. There is nothing to turn in.*
 
-- Check out `weensydb-02.cc`. Does it have data races? Can you think of a case that cause data races?
+- Check out `weensydb-02.cc`. Does it have data races? Can you think of a case that causes data races? Try it out and bring your case to the lecture.
 
 - How to use the mutex locks we learnt last week to solve the data race?
 
