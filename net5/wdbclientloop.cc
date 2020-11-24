@@ -54,12 +54,14 @@ int main(int argc, char** argv) {
     FILE* f = fdopen(fd, "w");
     FILE* fin = fdopen(fd, "r");
     int first_arg = optind;
-    size_t nloops = 0;
+    size_t ncommands = 0;
     double start_time = tstamp();
 
-    while (1) {
-        optind = first_arg;
-        while (optind < argc) {
+    while (true) {
+        for (int i = 0; i != 10000; ++i, ++ncommands) {
+            if (optind == argc) {
+                optind = first_arg;
+            }
             if (strcmp(argv[optind], "get") == 0
                 && optind + 1 < argc
                 && is_valid_key(argv[optind + 1])) {
@@ -121,11 +123,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        ++nloops;
-        if (nloops % 20 == 0) {
-            fprintf(stderr, "%zu loops in %.06f sec...\n",
-                    nloops, tstamp() - start_time);
-        }
+        fprintf(stderr, "%zu commands in %.06f sec...\n",
+                ncommands, tstamp() - start_time);
     }
 
     // done
