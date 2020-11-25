@@ -69,7 +69,6 @@ command::~command() {
 
 pid_t command::make_child(pid_t pgid) {
     assert(this->args.size() > 0);
-    (void) pgid; // You won’t need `pgid` until part 8.
 
     // Set up argument vector
     const char* argv[args.size() + 1];
@@ -91,6 +90,9 @@ pid_t command::make_child(pid_t pgid) {
         return -1;
     } else if (child_pid == 0) {
         // Child process
+        // Set process group ID
+        setpgid(0, pgid);
+
         // Set up stdin redirection if necessary
         if (!this->in_filename.empty()) {
             int fd = open(this->in_filename.c_str(), O_RDONLY);
@@ -140,32 +142,39 @@ pid_t command::make_child(pid_t pgid) {
     } else {
         // Parent process
         this->pid = child_pid;
+
+        // Set process group ID for child to avoid race condition
+        setpgid(child_pid, pgid);
+
         // Pipe dance (parent of writer)
         if (this->link == TYPE_PIPE) {
             close(pfd[1]);
             this->next->readfd = pfd[0];
         }
+
         // Pipe dance (parent of reader)
         if (this->readfd != -1) {
             close(this->readfd);
         }
     }
 
-    return this->pid;
+    return child_pid;
 }
 
 
 // run_pipeline(command *c)
-//    Run the pipeline of commands starting with `c`.
+//    Run the pipeline of commands starting with `c`, all with
+//    the same process group ID; returns this pgid.
 
-void run_pipeline(command *c) {
-    c->make_child(0);
-    if (c->link != TYPE_PIPE) {
-        return;
+pid_t run_pipeline(command *c) {
+    pid_t pgid = c->make_child(0);
+    for (; c->next; c = c->next) {
+        if (c->link != TYPE_PIPE) {
+            break;
+        }
+        c->next->make_child(pgid);
     }
-    if (c->next) {
-        run_pipeline(c->next);
-    }
+    return pgid;
 }
 
 
@@ -202,26 +211,36 @@ void run_conditional(command *c, bool bg) {
     if (!bg || pid == 0) {
         while (true) {
             // Run pipeline
-            run_pipeline(c);
+            pid_t pgid = run_pipeline(c);
             // Seek to end of pipeline 
             while (c->link == TYPE_PIPE) {
                 c = c->next;
             }
-            
+
             // Wait for last command in pipeline to terminate
+            // and claim foreground if necessary (for interruptions)
+            !bg && claim_foreground(pgid);
             int wstatus;
             pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
             assert(c->pid == exited_pid);
+            !bg && claim_foreground(0);
 
-            // Handle conditionals
+            // Handle conditionals by skipping each command whose
+            // exit status is irrelevant to the conditional
             if (WIFEXITED(wstatus)) {
-                // Skip each command whose exit status is irrelevant to conditional
+                // Process exited (either success or failure)
                 while ((WEXITSTATUS(wstatus) == 0 && get_cond_type(c) == TYPE_OR)
                        || (WEXITSTATUS(wstatus) != 0 && get_cond_type(c) == TYPE_AND)) {
-                    c = c->next;
-                    while (c->link == TYPE_PIPE) {
+                    do {
                         c = c->next;
-                    }
+                    } while (c->link == TYPE_PIPE);
+                }
+            } else if (WIFSIGNALED(wstatus) && WTERMSIG(wstatus) == SIGINT) {
+                // Process was terminated by SIGINT (always failure)
+                while (get_cond_type(c) == TYPE_AND) {
+                    do {
+                        c = c->next;
+                    } while (c->link == TYPE_PIPE);
                 }
             }
 
