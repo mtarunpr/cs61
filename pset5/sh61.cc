@@ -16,9 +16,9 @@ struct command {
     int link;       // control operator terminating this command
     int readfd;     // read-end fd if read end of pipe, -1 otherwise
 
-    std::string in_filename;
-    std::string out_filename;
-    std::string err_filename;
+    std::string in_filename;    // stdin file name, if any
+    std::string out_filename;   // stdout file name, if any
+    std::string err_filename;   // stderr file name, if any
 
     command();
     ~command();
@@ -100,12 +100,10 @@ pid_t command::make_child(pid_t pgid) {
             }
             dup2(fd, STDIN_FILENO);
             close(fd);
-        } else {
-            // Pipe dance (reader)
-            if (this->readfd != -1) {
+        } else if (this->readfd != -1) {
+                // Pipe dance (reader)
                 dup2(this->readfd, STDIN_FILENO);
                 close(this->readfd);
-            }
         }
 
         // Set up stdout redirection if necessary
@@ -117,13 +115,11 @@ pid_t command::make_child(pid_t pgid) {
             }
             dup2(fd, STDOUT_FILENO);
             close(fd);
-        } else {
-            // Pipe dance (writer)
-            if (this->link == TYPE_PIPE) {
+        } else if (this->link == TYPE_PIPE) {
+                // Pipe dance (writer)
                 close(pfd[0]);
                 dup2(pfd[1], STDOUT_FILENO);
                 close(pfd[1]);
-            }
         }
 
         // Set up stderr redirection if necessary
@@ -286,11 +282,8 @@ void run(command* c) {
 
 command* parse_line(const char* s) {
     shell_parser parser(s);
-    // Your code here!
 
     // Build the command
-    // The handout code treats every token as a normal command word.
-    // You'll add code to handle operators.
     command* front = nullptr;
     command* c = nullptr;
     for (shell_token_iterator it = parser.begin(); it != parser.end(); ++it) {
