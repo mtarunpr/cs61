@@ -16,6 +16,10 @@ struct command {
     int link;       // control operator terminating this command
     int readfd;     // read-end fd if read end of pipe, -1 otherwise
 
+    std::string in_filename;
+    std::string out_filename;
+    std::string err_filename;
+
     command();
     ~command();
 
@@ -87,17 +91,52 @@ pid_t command::make_child(pid_t pgid) {
         return -1;
     } else if (child_pid == 0) {
         // Child process
-        // Pipe dance (writer)
-        if (this->link == TYPE_PIPE) {
-            close(pfd[0]);
-            dup2(pfd[1], 1);
-            close(pfd[1]);
+        // Set up stdin redirection if necessary
+        if (!this->in_filename.empty()) {
+            int fd = open(this->in_filename.c_str(), O_RDONLY);
+            if (fd == -1) {
+                perror(this->in_filename.c_str());
+                _exit(EXIT_FAILURE);
+            }
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        } else {
+            // Pipe dance (reader)
+            if (this->readfd != -1) {
+                dup2(this->readfd, STDIN_FILENO);
+                close(this->readfd);
+            }
         }
-        // Pipe dance (reader)
-        if (this->readfd != -1) {
-            dup2(this->readfd, 0);
-            close(this->readfd);
+
+        // Set up stdout redirection if necessary
+        if (!this->out_filename.empty()) {
+            int fd = open(this->out_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd == -1) {
+                perror(this->out_filename.c_str());
+                _exit(EXIT_FAILURE);
+            }
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        } else {
+            // Pipe dance (writer)
+            if (this->link == TYPE_PIPE) {
+                close(pfd[0]);
+                dup2(pfd[1], STDOUT_FILENO);
+                close(pfd[1]);
+            }
         }
+
+        // Set up stderr redirection if necessary
+        if (!this->err_filename.empty()) {
+            int fd = open(this->err_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd == -1) {
+                perror(this->err_filename.c_str());
+                _exit(EXIT_FAILURE);
+            }
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+        }
+
         // Execute process
         if (execvp(argv[0], (char**) argv) == -1) {
             _exit(EXIT_FAILURE);
@@ -121,7 +160,7 @@ pid_t command::make_child(pid_t pgid) {
 
 
 // run_pipeline(command *c)
-//    Run the pipeline of commands starting with `c`
+//    Run the pipeline of commands starting with `c`.
 
 void run_pipeline(command *c) {
     c->make_child(0);
@@ -136,7 +175,7 @@ void run_pipeline(command *c) {
 
 // get_cond_type(c)
 //    Returns conditional operator following the pipeline
-//    `c` is in, or -1 if none
+//    `c` is in, or -1 if none.
 
 int get_cond_type(command* c) {
     if (c->link == TYPE_PIPE) {
@@ -255,6 +294,7 @@ command* parse_line(const char* s) {
     command* front = nullptr;
     command* c = nullptr;
     for (shell_token_iterator it = parser.begin(); it != parser.end(); ++it) {
+        // Create command in linked list
         if (!front) {
             front = new command;
             c = front;
@@ -263,13 +303,29 @@ command* parse_line(const char* s) {
             c = c->next;
         }
 
-        while (it.type() == TYPE_NORMAL) {
-            c->args.push_back(it.str());
-            ++it;
-            if (it == parser.end()) {
-                c->link = TYPE_SEQUENCE;
-                return front;
+        while (it.type() == TYPE_NORMAL || it.type() == TYPE_REDIRECT_OP) {
+            // Store arguments
+            if (it.type() == TYPE_NORMAL) {
+                c->args.push_back(it.str());
             }
+            // Parse redirects
+            if (it.type() == TYPE_REDIRECT_OP) {
+                char redirect_type = it.str().at(0);
+                ++it;
+                assert(it.type() == TYPE_NORMAL);
+                if (redirect_type == '<') {
+                    c->in_filename = it.str();
+                } else if (redirect_type == '>') {
+                    c->out_filename = it.str();
+                } else if (redirect_type == '2') {
+                    c->err_filename = it.str();
+                } else {
+                    fprintf(stderr, "Unsupported redirect\n");
+                    _exit(EXIT_FAILURE);
+                }
+            }
+            
+            ++it;
         }
 
         c->link = it.type();
