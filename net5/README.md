@@ -9,11 +9,64 @@ Advance work
 *Advance work should be completed before lecture, especially by active
 listeners. There is nothing to turn in.*
 
-- Check out `weensydb-02.cc`. Does it have data races? Can you think of a case that causes data races? Try it out and bring your case to the lecture.
+- Check out `weensydb-02.cc`. Does it have data races? Can you think
+  of a case that causes data races? Try it out and bring your case to
+  the lecture.
 
 - How to use the mutex locks we learnt last week to solve the data race?
 
-# WeensyDB
+WeensyDB variants
+-----------------
+
+1\. `weensydb-01` is the initial database. It can handle just one
+client connection at a time.
+
+2\. `weensydb-02` can support more than one client connection at a
+time, using one thread per client connection. Unfortunately, it is not
+well synchronized. The thread sanitizer will report these problems,
+and multiple clients calling `./wdbclientloop` (for instance,
+`./wdbclientloop set x 3` and `./wdbclientloop delete x`) can cause
+the database to segmentation fault.
+
+3\. `weensydb-03` is correctly synchronized. We add a global
+`std::mutex hash_mutex`, and lock that mutex before accessing the
+database. The code has no data races (no undefined behavior), which is
+better! But it still has concurrency issues. If a user connects to the
+database but does not complete a command, the thread will block in
+`fread` *while holding the `hash_mutex`*. It can block forever! One
+client can still exclude all other clients. For example:
+
+```
+$ telnet localhost 6169
+set x 2
+```
+
+(with no value provided) will block `./wdbclient set y 2` forever.
+This is called a **denial-of-service attack**, because the evil client
+doesn’t crash the server or steal information, it just makes the
+server unavailable to others. Server code executing on a client’s
+behalf can obtain a mutex that locks out all other clients.
+
+4\. `weensydb-04` is correctly synchronized, and it limits the scope
+of denial-of-service attacks by implementing **fine-grained
+synchronization**. Two threads accessing different hash buckets never
+conflict! Therefore, it is possible to synchronize using `NBUCKETS`
+mutexes, one per hash bucket, rather than using one “coarse-grained”
+mutex for the whole hash table. This prevents the attack above and
+increases concurrency, because now clients accessing different buckets
+can proceed in parallel. Unfortunately, there is still a
+denial-of-service attack *within* a bucket. A client stalled while
+accessing bucket 1 will lock out all other clients accessing bucket 1.
+
+5\. `weensydb-05` is correctly synchronized and has no
+denial-of-service attacks. The attack is possible because WeensyDB
+blocked (in `fread`) while holding a lock. It is generally a serious
+mistake to block while holding a lock. This version, therefore, makes
+sure to read a complete request *before* obtaining any lock. This
+affects just the `set` operation.
+
+WeensyDB
+--------
 
 The WeensyDB server is a [key-value store][] that maps string keys to string
 values. To use WeensyDB, you connect to its port (6169 by default) and send
