@@ -77,13 +77,13 @@ pid_t command::make_child(pid_t pgid) {
     // Set up pipeline if necessary
     int pfd[2];
     if (this->link == TYPE_PIPE && pipe(pfd) == -1) {
-        fprintf(stderr, "Pipe failed.");
+        fprintf(stderr, "%s\n", strerror(errno));
         return -1;
     }
 
     pid_t child_pid = fork();
     if (child_pid == -1) {
-        fprintf(stderr, "Unable to fork\n");
+        fprintf(stderr, "%s\n", strerror(errno));
         return -1;
     } else if (child_pid == 0) {
         // Child process
@@ -159,7 +159,7 @@ void run_conditional(command *c, bool bg) {
         // Create new shell for background process
         pid = fork();
         if (pid == -1) {
-            fprintf(stderr, "Unable to fork\n");
+            fprintf(stderr, "%s\n", strerror(errno));
             return;
         }
     }
@@ -340,8 +340,18 @@ int main(int argc, char* argv[]) {
             needprompt = 1;
         }
 
-        // Handle zombie processes and/or interrupt requests
-        // Your code here!
+        // Handle zombie processes and interrupt requests
+        int wstatus;
+        pid_t pid = -1;
+        while (true) {
+            pid = waitpid(-1, &wstatus, WNOHANG);
+            if (pid == 0 || (pid == -1 && errno == ECHILD)) {
+                break;
+            } else if (pid == -1) {
+                fprintf(stderr, "%s\n", strerror(errno));
+                return -1;
+            }
+        }
     }
 
     return 0;
