@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+static volatile sig_atomic_t recd_signal;
 
 // struct command
 //    Data structure describing a command. Add your own stuff.
@@ -48,6 +49,14 @@ command::~command() {
     }
 }
 
+
+// signal_handler(signal)
+//    Handles SIGINT signals for the shell.
+
+void signal_handler(int signal) {
+    (void) signal;
+    recd_signal = 1;
+}
 
 // COMMAND EXECUTION
 
@@ -205,6 +214,9 @@ void run_conditional(command *c, bool bg) {
         if (pid == -1) {
             fprintf(stderr, "%s\n", strerror(errno));
             return;
+        } else if (pid == 0) {
+            // Ignore SIGINT in the child shell
+            set_signal_handler(SIGINT, SIG_IGN);
         }
     }
 
@@ -242,6 +254,7 @@ void run_conditional(command *c, bool bg) {
                         c = c->next;
                     } while (c->link == TYPE_PIPE);
                 }
+                printf("\n");
             }
 
             // If next is within this conditional, run it in same shell
@@ -371,6 +384,9 @@ int main(int argc, char* argv[]) {
     claim_foreground(0);
     set_signal_handler(SIGTTOU, SIG_IGN);
 
+    // Handle SIGINT by remprompting
+    set_signal_handler(SIGINT, signal_handler);
+
     char buf[BUFSIZ];
     int bufpos = 0;
     bool needprompt = true;
@@ -381,6 +397,13 @@ int main(int argc, char* argv[]) {
             printf("sh61[%d]$ ", getpid());
             fflush(stdout);
             needprompt = false;
+        }
+
+        if (recd_signal) {
+            recd_signal = 0;
+            needprompt = true;
+            printf("\n");
+            continue;
         }
 
         // Read a string, checking for error or EOF
