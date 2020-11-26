@@ -86,6 +86,18 @@ pid_t command::make_child(pid_t pgid) {
     }
     argv[args.size()] = nullptr;
 
+    // Handle `cd` as a special case
+    bool is_cd = strcmp(argv[0], "cd") == 0;
+    if (is_cd) {
+        // If no argument to `cd`, remain in the same directory
+        if (!argv[1]) {
+            argv[1] = ".";
+        }
+        int a = chdir(argv[1]);
+        // No need to check return value as this is done in the child
+        (void) a;
+    }
+    
     // Set up pipeline if necessary
     int pfd[2];
     if (this->link == TYPE_PIPE && pipe(pfd) == -1) {
@@ -145,7 +157,18 @@ pid_t command::make_child(pid_t pgid) {
         }
 
         // Execute process
-        if (execvp(argv[0], (char**) argv) == -1) {
+        // If `cd`, repeat to report success/failure
+        if (is_cd) {
+            if (args.size() > 2) {
+                fprintf(stderr, "cd: too many arguments\n");
+                _exit(EXIT_FAILURE);
+            }
+            if (chdir(argv[1]) == -1) {
+                perror(argv[1]);
+                _exit(EXIT_FAILURE);
+            }
+            _exit(EXIT_SUCCESS);
+        } else if (execvp(argv[0], (char**) argv) == -1) {
             _exit(EXIT_FAILURE);
         }
     } else {
@@ -335,14 +358,14 @@ command* parse_line(const char* s) {
             }
             // Parse redirects
             if (it.type() == TYPE_REDIRECT_OP) {
-                char redirect_type = it.str().at(0);
+                std::string op = it.str();
                 ++it;
                 assert(it.type() == TYPE_NORMAL);
-                if (redirect_type == '<') {
+                if (op == "<") {
                     c->in_filename = it.str();
-                } else if (redirect_type == '>') {
+                } else if (op == ">") {
                     c->out_filename = it.str();
-                } else if (redirect_type == '2') {
+                } else if (op == "2>") {
                     c->err_filename = it.str();
                 } else {
                     fprintf(stderr, "Unsupported redirect\n");
@@ -432,10 +455,9 @@ int main(int argc, char* argv[]) {
         }
 
         // Handle zombie processes and interrupt requests
-        int wstatus;
         pid_t pid = -1;
         while (true) {
-            pid = waitpid(-1, &wstatus, WNOHANG);
+            pid = waitpid(-1, NULL, WNOHANG);
             if (pid == 0 || (pid == -1 && errno == ECHILD)) {
                 break;
             } else if (pid == -1) {
