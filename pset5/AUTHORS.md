@@ -13,4 +13,4 @@ Received helpful advice on the early parts from Michael Hwang and collaborated w
 
 Citations
 ---------
-None.
+[Bash Reference Manual](https://www.gnu.org/savannah-checkouts/gnu/bash/manual/bash.html#Redirections) for information on complex redirections.

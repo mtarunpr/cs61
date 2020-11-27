@@ -12,3 +12,4 @@ Grading notes (if any)
 
 Extra credit attempted (if any)
 -------------------------------
+Complex redirections - supports `[n]<`, `[n]>`, `[n]>>`, and any combination of them.

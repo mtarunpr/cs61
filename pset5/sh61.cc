@@ -4,6 +4,7 @@
 #include <vector>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <unordered_map>
 
 static volatile sig_atomic_t recd_signal;
 
@@ -17,9 +18,11 @@ struct command {
     int link;       // control operator terminating this command
     int readfd;     // read-end fd if read end of pipe, -1 otherwise
 
-    std::string in_filename;    // stdin file name, if any
-    std::string out_filename;   // stdout file name, if any
-    std::string err_filename;   // stderr file name, if any
+    // Redirections
+    // input files: key - fd, value - filename
+    std::unordered_map<int, std::string> in_files;
+    // output files: key - fd, value - pair of filename and mode (O_TRUNC or O_APPEND)
+    std::unordered_map<int, std::pair<std::string, int>> out_files;
 
     command();
     ~command();
@@ -114,46 +117,39 @@ pid_t command::make_child(pid_t pgid) {
         // Set process group ID
         setpgid(0, pgid);
 
-        // Set up stdin redirection if necessary
-        if (!this->in_filename.empty()) {
-            int fd = open(this->in_filename.c_str(), O_RDONLY);
+        // Set up input redirection
+        for (auto file : this->in_files) {
+            int fd = open(file.second.c_str(), O_RDONLY);
             if (fd == -1) {
-                perror(this->in_filename.c_str());
+                perror(file.second.c_str());
                 _exit(EXIT_FAILURE);
             }
-            dup2(fd, STDIN_FILENO);
+            dup2(fd, file.first);
             close(fd);
-        } else if (this->readfd != -1) {
-                // Pipe dance (reader)
-                dup2(this->readfd, STDIN_FILENO);
-                close(this->readfd);
         }
-
-        // Set up stdout redirection if necessary
-        if (!this->out_filename.empty()) {
-            int fd = open(this->out_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        // Set up output redirection
+        for (auto file : this->out_files) {
+            int fd = open(file.second.first.c_str(),
+                O_WRONLY | O_CREAT | file.second.second, 0666);
             if (fd == -1) {
-                perror(this->out_filename.c_str());
+                perror(file.second.first.c_str());
                 _exit(EXIT_FAILURE);
             }
-            dup2(fd, STDOUT_FILENO);
+            dup2(fd, file.first);
             close(fd);
-        } else if (this->link == TYPE_PIPE) {
-                // Pipe dance (writer)
-                close(pfd[0]);
-                dup2(pfd[1], STDOUT_FILENO);
-                close(pfd[1]);
         }
-
-        // Set up stderr redirection if necessary
-        if (!this->err_filename.empty()) {
-            int fd = open(this->err_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-            if (fd == -1) {
-                perror(this->err_filename.c_str());
-                _exit(EXIT_FAILURE);
-            }
-            dup2(fd, STDERR_FILENO);
-            close(fd);
+        
+        // Pipe dance (only pipe if input/output is not being redirected)
+        if (this->readfd != -1 && this->in_files.find(STDIN_FILENO) == this->in_files.end()) {
+            // Reader
+            dup2(this->readfd, STDIN_FILENO);
+            close(this->readfd);
+        }
+        if (this->link == TYPE_PIPE && this->out_files.find(STDOUT_FILENO) == this->out_files.end()) {
+            // Writer
+            close(pfd[0]);
+            dup2(pfd[1], STDOUT_FILENO);
+            close(pfd[1]);
         }
 
         // Execute process
@@ -361,15 +357,31 @@ command* parse_line(const char* s) {
                 std::string op = it.str();
                 ++it;
                 assert(it.type() == TYPE_NORMAL);
-                if (op == "<") {
-                    c->in_filename = it.str();
-                } else if (op == ">") {
-                    c->out_filename = it.str();
-                } else if (op == "2>") {
-                    c->err_filename = it.str();
+
+                // Get fd (if present) and raw operator (without fd)
+                int fd = -1;
+                std::string op_raw;
+                if (isdigit(op.at(0))) {
+                    fd = std::stoi(op);
+                    for (unsigned i = 0; i < op.length(); ++i) {
+                        if (!isdigit(op.at(i))) {
+                            op_raw += op.at(i);
+                        }
+                    }
                 } else {
-                    fprintf(stderr, "Unsupported redirect\n");
-                    _exit(EXIT_FAILURE);
+                    op_raw = op;
+                }
+
+                if (op_raw == "<") {
+                    fd = fd == -1 ? STDIN_FILENO : fd;
+                    c->in_files[fd] = it.str();
+                } else if (op_raw == ">" || op_raw == ">>") {
+                    fd = fd == -1 ? STDOUT_FILENO : fd;
+                    int mode = O_TRUNC;
+                    if (op_raw == ">>") {
+                        mode = O_APPEND;
+                    }
+                    c->out_files[fd] = std::make_pair(it.str(), mode);
                 }
             }
             
@@ -417,7 +429,10 @@ int main(int argc, char* argv[]) {
     while (!feof(command_file)) {
         // Print the prompt at the beginning of the line
         if (needprompt && !quiet) {
-            printf("sh61[%d]$ ", getpid());
+            // Add some color
+            printf("\033[1;32msh61");
+            printf("\033[1;34m[%d]", getpid());
+            printf("\033[0m$ ");
             fflush(stdout);
             needprompt = false;
         }
