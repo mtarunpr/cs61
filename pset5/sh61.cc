@@ -89,16 +89,13 @@ pid_t command::make_child(pid_t pgid) {
     }
     argv[args.size()] = nullptr;
 
-    // Handle `cd` as a special case
+    // Check if command is `cd` for later
     bool is_cd = strcmp(argv[0], "cd") == 0;
     if (is_cd) {
         // If no argument to `cd`, remain in the same directory
         if (!argv[1]) {
             argv[1] = ".";
         }
-        int a = chdir(argv[1]);
-        // No need to check return value as this is done in the child
-        (void) a;
     }
     
     // Set up pipeline if necessary
@@ -183,6 +180,13 @@ pid_t command::make_child(pid_t pgid) {
         // Pipe dance (parent of reader)
         if (this->readfd != -1) {
             close(this->readfd);
+        }
+
+        // Handle `cd` as a special case
+        if (is_cd) {
+            int r = chdir(argv[1]);
+            // No need to check return value as this is done in the child
+            (void) r;
         }
     }
 
