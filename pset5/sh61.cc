@@ -24,11 +24,22 @@ struct command {
     // output files: key - fd, value - pair of filename and mode (O_TRUNC or O_APPEND)
     std::unordered_map<int, std::pair<std::string, int>> out_files;
 
+    // Subshells
+    command* sub_front;  // pointer to first command of subshell, nullptr if none
+    bool sub_bg;         // true iff this is being run inside a background subshell
+
     command();
     ~command();
 
     pid_t make_child(pid_t pgid);
 };
+
+
+// run(c)
+//    Runs the given command and returns exit status.
+//    See definition below for more.
+
+int run(command*);
 
 
 // command::command()
@@ -40,6 +51,8 @@ command::command() {
     this->next = nullptr;
     this->link = TYPE_SEQUENCE;
     this->readfd = -1;
+    this->sub_front = nullptr;
+    this->sub_bg = false;
 }
 
 
@@ -47,6 +60,9 @@ command::command() {
 //    This destructor function is called to delete a command.
 
 command::~command() {
+    if (this->sub_front) {
+        delete this->sub_front;
+    }
     if (this->next) {
         delete this->next;
     }
@@ -80,8 +96,6 @@ void signal_handler(int signal) {
 //       this will require TWO calls to `setpgid`.
 
 pid_t command::make_child(pid_t pgid) {
-    assert(this->args.size() > 0);
-
     // Set up argument vector
     const char* argv[args.size() + 1];
     for (size_t i = 0; i < args.size(); ++i) {
@@ -90,7 +104,7 @@ pid_t command::make_child(pid_t pgid) {
     argv[args.size()] = nullptr;
 
     // Check if command is `cd` for later
-    bool is_cd = strcmp(argv[0], "cd") == 0;
+    bool is_cd = !this->sub_front && strcmp(argv[0], "cd") == 0;
     if (is_cd) {
         // If no argument to `cd`, remain in the same directory
         if (!argv[1]) {
@@ -150,8 +164,15 @@ pid_t command::make_child(pid_t pgid) {
         }
 
         // Execute process
-        // If `cd`, repeat to report success/failure
-        if (is_cd) {
+        if (this->sub_front) {
+            // Run subshell
+            if(run(this->sub_front) == 0) {
+                _exit(EXIT_SUCCESS);
+            } else {
+                _exit(EXIT_FAILURE);
+            }
+        } else if (is_cd) {
+            // If `cd`, repeat in child to report success/failure
             if (args.size() > 2) {
                 fprintf(stderr, "cd: too many arguments\n");
                 _exit(EXIT_FAILURE);
@@ -228,15 +249,23 @@ int get_cond_type(command* c) {
 // run_conditional(c, bg)
 //    Run the conditional chain of pipelines starting with `c`
 //    in the background (if `bg` is true) or foreground (otherwise).
+//    Returns the exit status.
 
-void run_conditional(command *c, bool bg) {
+int run_conditional(command *c, bool bg) {
+    // Mark all subshell commands to avoid claiming foreground
+    if (bg || c->sub_bg) {
+        for (command* it = c->sub_front; it; it = it->next) {
+            it->sub_bg = true;
+        }
+    }
+    int exit_status = -1;
     pid_t pid = -1;
     if (bg) {
         // Create new shell for background process
         pid = fork();
         if (pid == -1) {
             fprintf(stderr, "%s\n", strerror(errno));
-            return;
+            return exit_status;
         } else if (pid == 0) {
             // Ignore SIGINT in the child shell
             set_signal_handler(SIGINT, SIG_IGN);
@@ -254,24 +283,26 @@ void run_conditional(command *c, bool bg) {
 
             // Wait for last command in pipeline to terminate
             // and claim foreground if necessary (for interruptions)
-            !bg && claim_foreground(pgid);
+            !bg && !c->sub_bg && claim_foreground(pgid);
             int wstatus;
             pid_t exited_pid = waitpid(c->pid, &wstatus, 0);
             assert(c->pid == exited_pid);
-            !bg && claim_foreground(0);
+            !bg && !c->sub_bg && claim_foreground(0);
 
             // Handle conditionals by skipping each command whose
             // exit status is irrelevant to the conditional
             if (WIFEXITED(wstatus)) {
                 // Process exited (either success or failure)
-                while ((WEXITSTATUS(wstatus) == 0 && get_cond_type(c) == TYPE_OR)
-                       || (WEXITSTATUS(wstatus) != 0 && get_cond_type(c) == TYPE_AND)) {
+                exit_status = WEXITSTATUS(wstatus);
+                while ((exit_status == 0 && get_cond_type(c) == TYPE_OR)
+                       || (exit_status != 0 && get_cond_type(c) == TYPE_AND)) {
                     do {
                         c = c->next;
                     } while (c->link == TYPE_PIPE);
                 }
             } else if (WIFSIGNALED(wstatus) && WTERMSIG(wstatus) == SIGINT) {
                 // Process was terminated by SIGINT (always failure)
+                exit_status = 1;
                 while (get_cond_type(c) == TYPE_AND) {
                     do {
                         c = c->next;
@@ -293,13 +324,13 @@ void run_conditional(command *c, bool bg) {
             _exit(EXIT_SUCCESS);
         }
     }
+    return exit_status;
 }
 
 
 // run(c)
-//    Run the command *list* starting at `c`. Initially this just calls
-//    `make_child` and `waitpid`; you’ll extend it to handle command lists,
-//    conditionals, and pipelines.
+//    Run the command *list* starting at `c`.
+//    Returns the exit status.
 //
 //    PART 1: Start the single command `c` with `c->make_child(0)`,
 //        and wait for it to finish using `waitpid`.
@@ -317,31 +348,29 @@ void run_conditional(command *c, bool bg) {
 //       - Call `claim_foreground(pgid)` before waiting for the pipeline.
 //       - Call `claim_foreground(0)` once the pipeline is complete.
 
-void run(command* c) {
+int run(command* c) {
     command* front = c;
     // Seek to end of conditional
     while (c->link != TYPE_SEQUENCE && c->link != TYPE_BACKGROUND) {
         c = c->next;
     }
-    run_conditional(front, c->link == TYPE_BACKGROUND);
+    int exit_status = run_conditional(front, c->link == TYPE_BACKGROUND);
     if (c->next) {
-        run(c->next);
+        exit_status = run(c->next);
     }
+    return exit_status;
 }
 
 
-// parse_line(s)
-//    Parse the command list in `s` and return it. Returns `nullptr` if
-//    `s` is empty (only spaces). You’ll extend it to handle more token
-//    types.
+// parse_list(it, end)
+//    Parse the command list starting at `it` and ending with
+//    a right parenthesis or until `end` is encountered.
 
-command* parse_line(const char* s) {
-    shell_parser parser(s);
-
+command* parse_list(shell_token_iterator& it, shell_token_iterator end) {
     // Build the command
     command* front = nullptr;
     command* c = nullptr;
-    for (shell_token_iterator it = parser.begin(); it != parser.end(); ++it) {
+    for (; it != end; ++it) {
         // Create command in linked list
         if (!front) {
             front = new command;
@@ -351,6 +380,13 @@ command* parse_line(const char* s) {
             c = c->next;
         }
 
+        // Parse subshell list
+        if (it.type() == TYPE_LPAREN) {
+            ++it;
+            c->sub_front = parse_list(it, end);
+            ++it;
+        }
+        
         while (it.type() == TYPE_NORMAL || it.type() == TYPE_REDIRECT_OP) {
             // Store arguments
             if (it.type() == TYPE_NORMAL) {
@@ -388,13 +424,27 @@ command* parse_line(const char* s) {
                     c->out_files[fd] = std::make_pair(it.str(), mode);
                 }
             }
-            
             ++it;
         }
 
         c->link = it.type();
+        if (c->link == TYPE_RPAREN) {
+            c->link = TYPE_SEQUENCE;
+            return front;
+        }
     }
     return front;
+}
+
+
+// parse_line(s)
+//    Parse the command list in `s` and return it. Returns `nullptr` if
+//    `s` is empty (only spaces).
+
+command* parse_line(const char* s) {
+    shell_parser parser(s);
+    shell_token_iterator it = parser.begin();
+    return parse_list(it, parser.end());
 }
 
 
