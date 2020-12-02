@@ -1,0 +1,12 @@
+*-O0
+*-unsafe
+incr-atomic
+incr-basic
+incr-mutex
+incr-spinlock
+incr-trymutex
+incr-volatile
+wdbblaster
+wdbclient
+wdbclientloop
+weensydb-0[0-9]
