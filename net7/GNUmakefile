@@ -1,4 +1,4 @@
-PROGRAMS = server server-select wdbblaster server-epoll
+PROGRAMS = server-select wdbblaster server-epoll
 all: $(PROGRAMS)
 
 O = 2
