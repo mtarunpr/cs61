@@ -72,6 +72,23 @@ int main(int argc, char** argv) {
             fprintf(f, "delete %s\r\n", argv[optind + 1]);
             optind += 2;
 
+        } else if (strcmp(argv[optind], "exch") == 0
+                   && optind + 2 < argc) {
+            fprintf(f, "exch %s %s\r\n",
+                    argv[optind + 1], argv[optind + 2]);
+            optind += 3;
+
+        } else if (strcmp(argv[optind], "cas") == 0
+                   && optind + 3 < argc) {
+            size_t old_len = strlen(argv[optind + 2]);
+            size_t new_len = strlen(argv[optind + 3]);
+            fprintf(f, "cas %s %zu %zu\r\n",
+                    argv[optind + 1], old_len, new_len);
+            fwrite(argv[optind + 2], 1, old_len, f);
+            fwrite(argv[optind + 3], 1, new_len, f);
+            fprintf(f, "\r\n");
+            optind += 4;
+
         } else {
             usage(1);
         }
