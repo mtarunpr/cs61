@@ -1,6 +1,6 @@
-BASEPROGRAMS = server-select wdbblaster server-epoll
-PROGRAMS = $(BASEPROGRAMS)
-all: $(PROGRAMS)
+MMPROGRAMS = matrixmultiply $(patsubst %.cc,%,$(wildcard matrixmultiply-*.cc))
+PROGRAMS = $(MMPROGRAMS)
+all: $(MMPROGRAMS)
 
 variants = $(1) $(addsuffix -unsafe,$(1)) $(addsuffix -O0,$(1))
 
@@ -9,7 +9,7 @@ PTHREAD = 1
 include ../common/rules.mk
 LDFLAGS := $(filter-out -no-pie,$(LDFLAGS))
 LIBS := -lpthread
-CXXFLAGS += -Wno-unused-result
+-include config.mk
 
 UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
 
@@ -26,19 +26,18 @@ UNSAFEFLAGS := -U_FORTIFY_SOURCE -fno-stack-protector $(if $(ISLINUX),-no-pie,)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -O1 $(DEPCFLAGS) -o $@ -c $<
 
 
-$(BASEPROGRAMS): %: %.o helpers.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -o $@ $^
+$(MMPROGRAMS): %: %.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(O) -o $@ $^ $(LIBS)
 
-$(addsuffix -O0,$(BASEPROGRAMS)): %: %.o helpers-O0.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -O0 -o $@ $^
+$(addsuffix -O0,$(MMPROGRAMS)): %: %.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -O0 -o $@ $^ $(LIBS)
 
-$(addsuffix -unsafe,$(BASEPROGRAMS)): %: %.o helpers-unsafe.o
-	$(CXX) $(CXXFLAGS) $(UNSAFEFLAGS) $(LDFLAGS) -O1 -o $@ $^
-
+$(addsuffix -unsafe,$(MMPROGRAMS)): %: %.o
+	$(CXX) $(CXXFLAGS) $(UNSAFEFLAGS) $(LDFLAGS) -O1 -o $@ $^ $(LIBS)
 
 
 clean:
-	rm -f $(call variants,$(BASEPROGRAMS)) *.o *.core
+	rm -f $(call variants,$(MMPROGRAMS)) *.o *.core
 	rm -rf $(DEPSDIR) *.dSYM
 
 .PHONY: all clean
