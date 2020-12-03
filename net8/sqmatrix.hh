@@ -1,5 +1,6 @@
 #ifndef SQMATRIX_HH
 #define SQMATRIX_HH
+#include <cstddef>
 #include <utility>
 
 // sqmatrix -- type representing a square matrix of `double` elements
