@@ -3,7 +3,7 @@
 
 int main(int argc, char* argv[]) {
     array_info info = array_parse_arguments(argc, argv);
-    double start = timestamp();
+    double start = tstamp();
 
     // create sorted list by insertion
     std::list<int> seq;
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
         seq.insert(pos, value);
     }
 
-    printf("created list in %.06f sec\n", timestamp() - start);
+    printf("created list in %.06f sec\n", tstamp() - start);
     sequence_print(seq);
 
     // check that the collection is sorted

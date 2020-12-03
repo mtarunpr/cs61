@@ -6,8 +6,8 @@
 struct sqmatrix {
     size_t sz;    // matrix dimension
 
-    // sqmatrix(size) constructor
-    //    Initialize a `size * size` matrix.
+    // sqmatrix(size)
+    //    Construct a `size * size` matrix. Its contents can be uninitialized.
     sqmatrix(size_t size) {
         this->sz = size;
         // YOUR CODE HERE
@@ -40,7 +40,8 @@ struct sqmatrix {
     }
 
     // operator()(i, j)
-    //    Synonym for `at(i, j)`, but easier to type.
+    //    Synonym for `at(i, j)`, but easier to type. For instance,
+    //    `m(1, 2)` returns `m.at(1, 2)`.
     double& operator()(size_t i, size_t j) {
         return this->at(i, j);
     }

@@ -16,7 +16,7 @@ extern bool quiet;
 extern double start_tstamp;
 
 // tstamp()
-//    Return a current timestamp as a double.
+//    Return current timestamp as a double.
 inline double tstamp() {
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);

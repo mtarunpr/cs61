@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 
     printf("accessing data in %s order:\n", info.pattern);
     sequence_print(info.array, info.size);
-    double start = timestamp();
+    double start = tstamp();
 
     // sum elements of `data` array, accessed in the order defined by the
     // argument
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 
     // check the checksum
     assert(sum == expected_sum);
-    printf("OK in %.06f sec!\n", timestamp() - start);
+    printf("OK in %.06f sec!\n", tstamp() - start);
 
     delete[] info.array;
     delete[] data;

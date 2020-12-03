@@ -122,13 +122,13 @@ inline std::vector<int> sequence_append(const std::vector<int>& a,
 }
 
 
-// timestamp()
-//    Return the current time in seconds.
+// tstamp()
+//    Return current timestamp as a double.
 
-inline double timestamp() {
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    return tv.tv_sec + (double) tv.tv_usec * 1e-6;
+inline double tstamp() {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ts.tv_sec + 1e-9 * ts.tv_nsec;
 }
 
 #endif
