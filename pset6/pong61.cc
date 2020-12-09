@@ -254,13 +254,26 @@ void pong_thread(int x, int y) {
     char url[256];
     snprintf(url, sizeof(url), "move?x=%d&y=%d&style=on", x, y);
 
-    http_connection* conn = http_connect(pong_addr);
-    conn->send_request(url);
-    conn->receive_response_headers();
-    if (conn->status_code_ != 200) {
-        fprintf(stderr, "%.3f sec: warning: %d,%d: "
-                "server returned status %d (expected 200)\n",
-                elapsed(), x, y, conn->status_code_);
+    double wait_time = 0.01;
+    http_connection* conn;
+    while (true) {
+        conn = http_connect(pong_addr);
+        conn->send_request(url);
+        conn->receive_response_headers();
+        if (conn->status_code_ != 200) {
+            fprintf(stderr, "%.3f sec: warning: %d,%d: "
+                    "server returned status %d (expected 200)\n",
+                    elapsed(), x, y, conn->status_code_);
+        }
+        if (conn->cstate_ == cstate_broken) {
+            http_close(conn);
+            usleep(wait_time * 1000000);
+            if (wait_time <= 128) {
+                wait_time *= 2;
+            }
+        } else {
+            break;
+        }
     }
 
     conn->receive_response_body();
