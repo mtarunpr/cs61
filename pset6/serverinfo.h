@@ -10,7 +10,7 @@
 #endif
 
 #ifndef PONG_USER
-# define PONG_USER "proxy-minlan-test"
+# define PONG_USER "mtarunpr"
 #endif
 
 #ifndef PROXY_HOST
