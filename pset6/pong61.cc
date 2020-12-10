@@ -15,6 +15,9 @@
 #include <atomic>
 #include <thread>
 
+std::mutex mutex;
+std::condition_variable_any cv;
+
 static const char* pong_host = PONG_HOST;
 static int pong_port = PONG_PORT;
 static const char* pong_user = PONG_USER;
@@ -246,7 +249,7 @@ char* http_connection::truncate_response() {
 
 // MAIN PROGRAM
 
-bool move_done;
+std::atomic<bool> header_done;
 
 // pong_thread(x, y)
 //    Connect to the server at the position `x, y`.
@@ -275,6 +278,9 @@ void pong_thread(int x, int y) {
         }
     }
 
+    header_done = true;
+    cv.notify_all();
+
     conn->receive_response_body();
     double result = strtod(conn->buf_, nullptr);
     if (result < 0) {
@@ -288,7 +294,7 @@ void pong_thread(int x, int y) {
     // signal the main thread to continue
     // XXX The handout code uses polling and has data races. For full credit,
     // replace this with a synchronization object that supports blocking.
-    move_done = true;
+
     // and exit!
 }
 
@@ -432,10 +438,14 @@ int main(int argc, char** argv) {
         // wait until that thread signals us to continue
         // XXX The handout code uses polling. For full credit, replace this
         // with a blocking-aware synchronization object.
-        while (!move_done) {
-            usleep(20000); // *sort of* blocking...
+
+        {
+            std::unique_lock<std::mutex> guard(mutex);
+            while (!header_done) {
+                cv.wait(guard);
+            }
+            header_done = false;
         }
-        move_done = false;
 
         // update position
         while (ball.move() <= 0) {
