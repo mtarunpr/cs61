@@ -17,6 +17,7 @@
 #include <deque>
 
 std::mutex mutex;
+std::mutex idle_connections_mutex;
 std::condition_variable_any cv;
 
 static const char* pong_host = PONG_HOST;
@@ -263,16 +264,21 @@ void pong_thread(int x, int y) {
     double wait_time = 0.01;
     http_connection* conn;
     while (true) {
+        idle_connections_mutex.lock();
         if (idle_connections.empty()) {
             conn = http_connect(pong_addr);
         } else {
             conn = idle_connections.front();
             idle_connections.pop_front();
         }
+        idle_connections_mutex.unlock();
+
         conn->send_request(url);
         conn->receive_response_headers();
         if (conn->status_code_ == -1) {
             http_close(conn);
+            // conn->cstate_ == cstate_idle;
+            // idle_connections.push_back(conn);
             usleep(wait_time * 1000000);
             if (wait_time <= 128) {
                 wait_time *= 2;
@@ -292,7 +298,9 @@ void pong_thread(int x, int y) {
     conn->receive_response_body();
 
     assert(conn->cstate_ == cstate_idle);
+    idle_connections_mutex.lock();
     idle_connections.push_back(conn);
+    idle_connections_mutex.unlock();
 
     double result = strtod(conn->buf_, nullptr);
     if (result < 0) {
