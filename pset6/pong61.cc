@@ -14,6 +14,7 @@
 #include <cassert>
 #include <atomic>
 #include <thread>
+#include <deque>
 
 std::mutex mutex;
 std::condition_variable_any cv;
@@ -90,6 +91,8 @@ struct http_connection {
     bool check_response_body();
 };
 
+// List of idle connections
+std::deque<http_connection*> idle_connections;
 
 // http_connect(ai)
 //    Open a new connection to the server described by `ai`. Returns a new
@@ -260,7 +263,12 @@ void pong_thread(int x, int y) {
     double wait_time = 0.01;
     http_connection* conn;
     while (true) {
-        conn = http_connect(pong_addr);
+        if (idle_connections.empty()) {
+            conn = http_connect(pong_addr);
+        } else {
+            conn = idle_connections.front();
+            idle_connections.pop_front();
+        }
         conn->send_request(url);
         conn->receive_response_headers();
         if (conn->status_code_ == -1) {
@@ -282,14 +290,16 @@ void pong_thread(int x, int y) {
     cv.notify_all();
 
     conn->receive_response_body();
+
+    assert(conn->cstate_ == cstate_idle);
+    idle_connections.push_back(conn);
+
     double result = strtod(conn->buf_, nullptr);
     if (result < 0) {
         fprintf(stderr, "%.3f sec: server returned error: %s\n",
                 elapsed(), conn->truncate_response());
         exit(1);
     }
-
-    http_close(conn);
 
     // signal the main thread to continue
     // XXX The handout code uses polling and has data races. For full credit,
