@@ -19,6 +19,7 @@
 std::mutex mutex;
 std::mutex idle_connections_mutex;
 std::mutex stop_mutex;
+std::mutex buf_mutex;
 std::condition_variable_any cv;
 
 static const char* pong_host = PONG_HOST;
@@ -68,16 +69,24 @@ struct http_connection {
     bool has_content_length_; // true iff Content-Length was provided
     bool eof_ = false;        // true iff connection EOF has been reached
 
-    char buf_[BUFSIZ];        // Response buffer
+    char* buf_;               // Response buffer
+    size_t bufsize_;          // Capacity of response buffer
     size_t len_;              // Length of response buffer
 
 
     http_connection(int fd) {
         assert(fd >= 0);
         this->fd_ = fd;
+        this->bufsize_ = BUFSIZ;
+        this->buf_ = (char*) malloc(BUFSIZ);
+        if (!buf_) {
+            fprintf(stderr, "malloc failed\n");
+            exit(1);
+        }
     }
     ~http_connection() {
         close(this->fd_);
+        free(this->buf_);
     }
 
     // disallow copying and assignment
@@ -187,6 +196,17 @@ void http_connection::receive_response_headers() {
     // read & parse data until `http_process_response_headers`
     // tells us to stop
     while (this->process_response_headers()) {
+        buf_mutex.lock();
+        if (this->len_ + BUFSIZ > this->bufsize_) {
+            this->bufsize_ *= 2;
+            this->buf_ = (char*) realloc(this->buf_, this->bufsize_);
+            if (!this->buf_) {
+                fprintf(stderr, "realloc failed\n");
+                exit(1);
+            }
+        }
+        buf_mutex.unlock();
+
         ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ);
         if (nr == 0) {
             this->eof_ = true;
@@ -304,7 +324,9 @@ void pong_thread(int x, int y) {
     idle_connections.push_back(conn);
     idle_connections_mutex.unlock();
 
+    buf_mutex.lock();
     double result = strtod(conn->buf_, nullptr);
+    buf_mutex.unlock();
     if (result < 0) {
         fprintf(stderr, "%.3f sec: server returned error: %s\n",
                 elapsed(), conn->truncate_response());
