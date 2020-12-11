@@ -18,6 +18,7 @@
 
 std::mutex mutex;
 std::mutex idle_connections_mutex;
+std::mutex stop_mutex;
 std::condition_variable_any cv;
 
 static const char* pong_host = PONG_HOST;
@@ -273,13 +274,14 @@ void pong_thread(int x, int y) {
         }
         idle_connections_mutex.unlock();
 
+        stop_mutex.lock();
         conn->send_request(url);
+        stop_mutex.unlock();
+
         conn->receive_response_headers();
-        if (conn->status_code_ == -1) {
+        if (conn->cstate_ == cstate_broken && conn->status_code_ == -1) {
             http_close(conn);
-            // conn->cstate_ == cstate_idle;
-            // idle_connections.push_back(conn);
-            usleep(wait_time * 1000000);
+            std::this_thread::sleep_for(std::chrono::milliseconds((int) (wait_time * 1000)));
             if (wait_time <= 128) {
                 wait_time *= 2;
             }
@@ -307,6 +309,10 @@ void pong_thread(int x, int y) {
         fprintf(stderr, "%.3f sec: server returned error: %s\n",
                 elapsed(), conn->truncate_response());
         exit(1);
+    } else if (result > 0) {
+        stop_mutex.lock();
+        std::this_thread::sleep_for(std::chrono::milliseconds((int) result));
+        stop_mutex.unlock();
     }
 
     // signal the main thread to continue
