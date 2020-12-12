@@ -22,6 +22,8 @@ std::mutex stop_mutex;
 std::mutex buf_mutex;
 std::condition_variable_any cv;
 
+double latencies[PROXY_COUNT];
+
 static const char* pong_host = PONG_HOST;
 static int pong_port = PONG_PORT;
 static const char* pong_user = PONG_USER;
@@ -374,6 +376,18 @@ static void usage() {
 }
 
 
+// proxy_latency(proxy_num, proxy_addr)
+//    Store the latency of the specified proxy in `latencies[proxy_num]`.
+void proxy_latency(int proxy_num, addrinfo* proxy_addr) {
+    http_connection* conn = http_connect(proxy_addr);
+    conn->send_request("query?x=0&y=0");
+    double timestamp = tstamp();
+    conn->receive_response_headers();
+    conn->receive_response_body();
+    latencies[proxy_num] = tstamp() - timestamp;
+    http_close(conn);
+}
+
 // main(argc, argv)
 //    The main loop.
 int main(int argc, char** argv) {
@@ -425,7 +439,32 @@ int main(int argc, char** argv) {
         pong_host = PROXY_HOST;
     }
     if (!has_port && proxy) {
-        pong_port = PROXY_START_PORT;
+        std::thread threads[PROXY_COUNT];
+        for (int i = 0; i < PROXY_COUNT; ++i) {
+            addrinfo* proxy_addr = lookup_tcp_server(pong_host, PROXY_START_PORT + i);
+            try {
+                threads[i] = std::thread(proxy_latency, i, proxy_addr);
+            } catch (std::system_error& err) {
+                fprintf(stderr, "%.3f sec: cannot create thread: %s\n",
+                        elapsed(), err.what());
+                exit(1);
+            }
+        }
+
+        for (int i = 0; i < PROXY_COUNT; ++i) {
+            threads[i].join();
+        }
+
+        double min_latency = latencies[0];
+        int fast_proxy_num = 0;
+        for (int i = 1; i < PROXY_COUNT; ++i) {
+            if (latencies[i] < min_latency) {
+                min_latency = latencies[i];
+                fast_proxy_num = i;
+            }
+        }
+
+        pong_port = PROXY_START_PORT + fast_proxy_num;
     }
 
     // look up network address of pong server
