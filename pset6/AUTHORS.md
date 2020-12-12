@@ -3,15 +3,14 @@ Author and collaborators
 
 Primary student
 ---------------
-(Your name.)
+Tarun Prasad
 
 
 Collaborators
 -------------
-(List any other collaborators and describe help you got from other students
-in the class.)
+Collaborated with Michael Hwang and Anurag Mitra.
 
 
 Citations
 ---------
-(List any other sources consulted.)
+None
