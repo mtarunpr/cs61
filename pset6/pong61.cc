@@ -529,12 +529,13 @@ int main(int argc, char** argv) {
         // XXX The handout code uses polling. For full credit, replace this
         // with a blocking-aware synchronization object.
 
-        mutex.lock();
-        while (!header_done) {
-            cv.wait(mutex);
+        {
+            std::unique_lock<std::mutex> guard(mutex);
+            while (!header_done) {
+                cv.wait(guard);
+            }
+            header_done = false;
         }
-        header_done = false;
-        mutex.unlock();
 
         // update position
         while (ball.move() <= 0) {
