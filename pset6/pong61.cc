@@ -197,6 +197,7 @@ void http_connection::receive_response_headers() {
     // read & parse data until `http_process_response_headers`
     // tells us to stop
     while (this->process_response_headers()) {
+        // double buffer capacity if the next read can exceed current capacity
         if (this->len_ + BUFSIZ > this->bufsize_) {
             this->bufsize_ *= 2;
             this->buf_ = (char*) realloc(this->buf_, this->bufsize_);
@@ -206,6 +207,7 @@ void http_connection::receive_response_headers() {
             }
         }
 
+        // read BUFSIZ - 1 bytes to account for null-terminator
         ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ - 1);
         if (nr == 0) {
             this->eof_ = true;
@@ -242,6 +244,7 @@ void http_connection::receive_response_body() {
 
     // read response body (check_response_body tells us when to stop)
     while (this->check_response_body()) {
+        // double buffer capacity if the next read can exceed current capacity
         if (this->len_ + BUFSIZ > this->bufsize_) {
             this->bufsize_ *= 2;
             this->buf_ = (char*) realloc(this->buf_, this->bufsize_);
@@ -251,6 +254,7 @@ void http_connection::receive_response_body() {
             }
         }
         
+        // read BUFSIZ - 1 bytes to account for null-terminator
         ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ - 1);
         if (nr == 0) {
             this->eof_ = true;
@@ -293,6 +297,8 @@ void pong_thread(int x, int y) {
     double wait_time = 0.01;
     http_connection* conn;
     while (true) {
+        // only create new connection if no idle ones available
+        // lock to prevent data race when accessing connection table
         idle_connections_mutex.lock();
         if (idle_connections.empty()) {
             idle_connections_mutex.unlock();
@@ -303,16 +309,23 @@ void pong_thread(int x, int y) {
             idle_connections_mutex.unlock();
         }
 
+        // lock to avoid sending request when some thread
+        // has received a STOP request
         stop_mutex.lock();
         conn->send_request(url);
         stop_mutex.unlock();
 
         conn->receive_response_headers();
+        
+        // exponential backoff if connection is broken
         if (conn->cstate_ == cstate_broken && conn->status_code_ == -1) {
             http_close(conn);
             std::this_thread::sleep_for(std::chrono::milliseconds((int) (wait_time * 1000)));
-            if (wait_time <= 128) {
+            // limit wait time to 128 seconds
+            if (wait_time <= 64) {
                 wait_time *= 2;
+            } else {
+                wait_time = 128;
             }
         } else if (conn->status_code_ != 200) {
             fprintf(stderr, "%.3f sec: warning: %d,%d: "
@@ -323,6 +336,7 @@ void pong_thread(int x, int y) {
         }
     }
 
+    // signal the main thread to continue
     header_done = true;
     cv.notify_all();
 
@@ -334,21 +348,18 @@ void pong_thread(int x, int y) {
                 elapsed(), conn->truncate_response());
         exit(1);
     } else if (result > 0) {
+        // STOP request received: hold lock for specified time
+        // to prevent other threads from sending requests
         stop_mutex.lock();
         std::this_thread::sleep_for(std::chrono::milliseconds((int) result));
         stop_mutex.unlock();
     }
-
+    
+    // add now idle connection to the connection table
     assert(conn->cstate_ == cstate_idle);
     idle_connections_mutex.lock();
     idle_connections.push_back(conn);
     idle_connections_mutex.unlock();
-
-    // signal the main thread to continue
-    // XXX The handout code uses polling and has data races. For full credit,
-    // replace this with a synchronization object that supports blocking.
-
-    // and exit!
 }
 
 
@@ -444,6 +455,7 @@ int main(int argc, char** argv) {
         pong_host = PROXY_HOST;
     }
     if (!has_port && proxy) {
+        // compute proxy latencies concurrently
         std::thread threads[PROXY_COUNT];
         for (int i = 0; i < PROXY_COUNT; ++i) {
             addrinfo* proxy_addr = lookup_tcp_server(pong_host, PROXY_START_PORT + i);
@@ -456,10 +468,12 @@ int main(int argc, char** argv) {
             }
         }
 
+        // wait for all threads to complete
         for (int i = 0; i < PROXY_COUNT; ++i) {
             threads[i].join();
         }
 
+        // find fastest proxy
         double min_latency = latencies[0];
         int fast_proxy_num = 0;
         for (int i = 1; i < PROXY_COUNT; ++i) {
@@ -526,9 +540,6 @@ int main(int argc, char** argv) {
         th.detach();
 
         // wait until that thread signals us to continue
-        // XXX The handout code uses polling. For full credit, replace this
-        // with a blocking-aware synchronization object.
-
         {
             std::unique_lock<std::mutex> guard(mutex);
             while (!header_done) {
