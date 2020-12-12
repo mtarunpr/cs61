@@ -19,7 +19,6 @@
 std::mutex mutex;
 std::mutex idle_connections_mutex;
 std::mutex stop_mutex;
-std::mutex buf_mutex;
 std::condition_variable_any cv;
 
 double latencies[PROXY_COUNT];
@@ -198,7 +197,6 @@ void http_connection::receive_response_headers() {
     // read & parse data until `http_process_response_headers`
     // tells us to stop
     while (this->process_response_headers()) {
-        buf_mutex.lock();
         if (this->len_ + BUFSIZ > this->bufsize_) {
             this->bufsize_ *= 2;
             this->buf_ = (char*) realloc(this->buf_, this->bufsize_);
@@ -207,9 +205,8 @@ void http_connection::receive_response_headers() {
                 exit(1);
             }
         }
-        buf_mutex.unlock();
 
-        ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ);
+        ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ - 1);
         if (nr == 0) {
             this->eof_ = true;
         } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
@@ -245,7 +242,16 @@ void http_connection::receive_response_body() {
 
     // read response body (check_response_body tells us when to stop)
     while (this->check_response_body()) {
-        ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ);
+        if (this->len_ + BUFSIZ > this->bufsize_) {
+            this->bufsize_ *= 2;
+            this->buf_ = (char*) realloc(this->buf_, this->bufsize_);
+            if (!this->buf_) {
+                fprintf(stderr, "realloc failed\n");
+                exit(1);
+            }
+        }
+        
+        ssize_t nr = read(this->fd_, &this->buf_[this->len_], BUFSIZ - 1);
         if (nr == 0) {
             this->eof_ = true;
         } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
@@ -289,12 +295,13 @@ void pong_thread(int x, int y) {
     while (true) {
         idle_connections_mutex.lock();
         if (idle_connections.empty()) {
+            idle_connections_mutex.unlock();
             conn = http_connect(pong_addr);
         } else {
             conn = idle_connections.front();
             idle_connections.pop_front();
+            idle_connections_mutex.unlock();
         }
-        idle_connections_mutex.unlock();
 
         stop_mutex.lock();
         conn->send_request(url);
@@ -321,14 +328,7 @@ void pong_thread(int x, int y) {
 
     conn->receive_response_body();
 
-    assert(conn->cstate_ == cstate_idle);
-    idle_connections_mutex.lock();
-    idle_connections.push_back(conn);
-    idle_connections_mutex.unlock();
-
-    buf_mutex.lock();
     double result = strtod(conn->buf_, nullptr);
-    buf_mutex.unlock();
     if (result < 0) {
         fprintf(stderr, "%.3f sec: server returned error: %s\n",
                 elapsed(), conn->truncate_response());
@@ -338,6 +338,11 @@ void pong_thread(int x, int y) {
         std::this_thread::sleep_for(std::chrono::milliseconds((int) result));
         stop_mutex.unlock();
     }
+
+    assert(conn->cstate_ == cstate_idle);
+    idle_connections_mutex.lock();
+    idle_connections.push_back(conn);
+    idle_connections_mutex.unlock();
 
     // signal the main thread to continue
     // XXX The handout code uses polling and has data races. For full credit,
@@ -524,13 +529,12 @@ int main(int argc, char** argv) {
         // XXX The handout code uses polling. For full credit, replace this
         // with a blocking-aware synchronization object.
 
-        {
-            std::unique_lock<std::mutex> guard(mutex);
-            while (!header_done) {
-                cv.wait(guard);
-            }
-            header_done = false;
+        mutex.lock();
+        while (!header_done) {
+            cv.wait(mutex);
         }
+        header_done = false;
+        mutex.unlock();
 
         // update position
         while (ball.move() <= 0) {
