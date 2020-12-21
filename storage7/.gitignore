@@ -1,0 +1,12 @@
+data
+forkmix
+[rw]-syncbyte
+[rw]-syncblock
+[rw]-osbyte
+[rw]-osbyterev
+[rw]-osblock
+[rw]-stdiobyte
+[rw]-stdiobyterev
+[rw]-stdiobytetwice
+[rw]-stdioblock
+[rw]-mmapbyte

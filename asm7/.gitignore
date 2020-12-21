@@ -1,0 +1,15 @@
+allf[cs].txt
+f[0-9][0-9]
+f[0-9][0-9][a-z]
+stringrep
+stringrep.s
+vectorrep
+vectorrep.s
+maprep
+maprep.s
+unordered_maprep
+unordered_maprep.s
+pairrep
+pairrep.s
+*.asm
+*-unsafe
