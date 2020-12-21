@@ -1,0 +1,8 @@
+layout asm
+layout regs
+b explode_bomb
+b *0x401931
+b *0x401932
+b *0x401933
+b *0x401934
+b *0x401939

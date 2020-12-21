@@ -1,0 +1,45 @@
+#! /bin/bash
+
+maindir=""
+destdir=cs61-psets
+
+if stat --format %i / >/dev/null 2>&1; then
+    statformatarg="--format"
+else
+    statformatarg="-f"
+fi
+myfileid=`stat $statformatarg %d:%i "${BASH_SOURCE[0]}" 2>/dev/null`
+
+dir="`pwd`"
+subdir=""
+while test "$dir" != / -a "$dir" != ""; do
+    thisfileid=`stat $statformatarg %d:%i "$dir"/cs61-run-docker 2>/dev/null`
+    if test -n "$thisfileid" -a "$thisfileid" = "$myfileid"; then
+        maindir="$dir"
+        break
+    fi
+    subdir="/`basename "$dir"`$subdir"
+    dir="`dirname "$dir"`"
+done
+
+if test -z "$maindir" && expr "${BASH_SOURCE[0]}" : / >/dev/null 2>&1; then
+    maindir="`dirname "${BASH_SOURCE[0]}"`"
+    subdir=""
+fi
+
+netarg=
+if test `uname` = Darwin; then
+    if ! netstat -n -a -p tcp | grep '\.12949[ 	].*LISTEN' >/dev/null; then
+        netarg='--expose=12949/tcp -p 12949:12949/tcp'
+    fi
+elif test -x /bin/netstat; then
+    if ! netstat -n -l -t | grep ':12949[ 	]' >/dev/null; then
+        netarg='--expose=12949/tcp -p 12949:12949/tcp'
+    fi
+fi
+
+if test -n "$maindir"; then
+    docker run -it --rm --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -v "$maindir":/home/cs61-user/$destdir -w "/home/cs61-user/$destdir$subdir" $netarg cs61:latest
+else
+    docker run -it --rm --cap-add=SYS_PTRACE --security-opt seccomp=unconfined cs61:latest
+fi
